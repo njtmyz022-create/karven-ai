@@ -249,7 +249,8 @@ export default function App() {
   // When the active backend is cloud, local session-key auth is irrelevant —
   // the cloud backend uses its own bearer token. Skip the API-key entry screen
   // in that case so Docker/public mode doesn't block cloud-only sessions.
-  const isActiveCloudBackend = active.backend.kind === "cloud";
+  const isActiveCloudBackend =
+    !IS_KARVEN_PRODUCT_BUILD && active.backend.kind === "cloud";
   const authMissing =
     bakedKeyMissing && !hasRegisteredKey && !isActiveCloudBackend;
   const queryClient = useQueryClient();
@@ -259,7 +260,7 @@ export default function App() {
   // a Cloud backend pointing at a *different* host must all trigger first-run
   // onboarding instead of the Manage Backends recovery modal — the onboarding
   // flow owns the Cloud login that replaces the stale backend.
-  const lockedCloudHost = getLockedCloudHost();
+  const lockedCloudHost = IS_KARVEN_PRODUCT_BUILD ? null : getLockedCloudHost();
   const lockedCloudAuthMode = getLockedCloudAuthMode();
   const isLockedToCloud = lockedCloudHost !== null;
   // True only when the active backend IS the configured locked Cloud host
@@ -360,7 +361,7 @@ export default function App() {
     activeCloudHealth?.disabled === true &&
     isCloudBackendApiKeyOrNetworkHealthError(activeCloudHealth.lastError);
 
-  if (showFirstRunOnboarding) {
+  if (showFirstRunOnboarding && !(IS_KARVEN_PRODUCT_BUILD && authMissing)) {
     return (
       <>
         <FirstRunOnboardingScreen onClose={markCompleted} />
