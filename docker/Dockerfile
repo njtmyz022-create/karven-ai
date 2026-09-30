@@ -185,12 +185,11 @@ RUN mkdir -p /home/openhands/.karven/agent-canvas/conversations \
 
 USER openhands
 
-# Persistence volumes:
-#   /home/openhands/.karven — Karven settings, secrets, conversations, automation DB
-#   /projects                  — user code the agent can read/edit
-# Bind-mount these for data to survive container restarts:
-#   docker run -v ~/.karven:/home/openhands/.karven -v ~/projects:/projects ...
-VOLUME ["/home/openhands/.karven", "/projects"]
+# Railway and other managed platforms attach persistence volumes through their
+# service configuration. Do not declare Docker VOLUME here: Railway rejects
+# that Dockerfile instruction. Attach a persistent volume at /home/openhands/.karven
+# for settings, secrets, conversations, automation state, and at /projects for
+# workspaces when the deployment platform supports multiple mounts.
 
 # The entrypoint starts all services and the ingress proxy.
 # Port 8000 is the unified entry point.
