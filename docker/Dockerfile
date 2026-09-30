@@ -125,7 +125,7 @@ RUN if command -v apt-get >/dev/null 2>&1; then \
         'Check-Valid-Until: no' \
         > /etc/apt/sources.list.d/debian.sources && \
       apt-get update && \
-      apt-get install -y --no-install-recommends libpq-dev && \
+      apt-get install -y --no-install-recommends libpq-dev gosu && \
       apt-get upgrade -y --no-install-recommends && \
       rm -rf /var/lib/apt/lists/*; \
     fi
@@ -183,7 +183,7 @@ RUN mkdir -p /home/openhands/.karven/agent-canvas/conversations \
              /projects && \
     chown -R openhands:openhands /home/openhands/.karven /projects
 
-USER openhands
+USER root
 
 # Railway and other managed platforms attach persistence volumes through their
 # service configuration. Do not declare Docker VOLUME here: Railway rejects

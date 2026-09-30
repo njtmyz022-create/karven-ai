@@ -64,6 +64,29 @@ set -uo pipefail
 log() { printf '[agent-canvas] %s\n' "$*"; }
 log_error() { printf '[agent-canvas] ERROR: %s\n' "$*" >&2; }
 
+# Railway mounts persistent volumes as root. Start the entrypoint as root only
+# long enough to prepare the writable mounts, then drop back to the existing
+# unprivileged `openhands` account before starting any application services.
+# The marker lives on the volume so existing trees are not recursively re-owned
+# on every container restart.
+if [ "$(id -u)" -eq 0 ]; then
+  if ! command -v gosu >/dev/null 2>&1; then
+    log_error "gosu is required to prepare Railway volume permissions safely."
+    exit 1
+  fi
+  export HOME=/home/openhands
+  for mount_path in /home/openhands/.karven /projects; do
+    mkdir -p "$mount_path"
+    ownership_marker="${mount_path}/.karven-volume-owner-v1"
+    if [ ! -f "$ownership_marker" ]; then
+      chown -R openhands:openhands "$mount_path"
+      touch "$ownership_marker"
+      chown openhands:openhands "$ownership_marker"
+    fi
+  done
+  exec gosu openhands:openhands "$0" "$@"
+fi
+
 # ── Load centralized defaults (generated from config/defaults.json at build) ─
 # shellcheck source=/dev/null
 if [ -f /opt/agent-canvas/defaults.env ]; then
