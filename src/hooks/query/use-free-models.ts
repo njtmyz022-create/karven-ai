@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import ConfigService from "#/api/config-service/config-service.api";
 import type { LLMModel } from "#/api/config-service/config-service.types";
+import { isNoBackend } from "#/api/backend-registry/active-store";
 import type { FreeModelSet } from "#/utils/format-model-name";
 import { useFreeModelsStore } from "#/stores/free-models-store";
 import { useActiveBackend } from "#/contexts/active-backend-context";
@@ -67,6 +68,7 @@ async function fetchAllOpenHandsModels(
  */
 const useOpenHandsModels = () => {
   const { backend, orgId } = useActiveBackend();
+  const hasBackend = !isNoBackend(backend);
   const backendScope = [
     backend.id,
     backend.connectionRevision ?? 0,
@@ -91,6 +93,10 @@ const useOpenHandsModels = () => {
     },
     staleTime: VERIFIED_MODELS_STALE_TIME,
     gcTime: VERIFIED_MODELS_GC_TIME,
+    enabled: hasBackend,
+    // This is optional model metadata. A missing backend during initial setup
+    // must not surface as a global error toast or block the connection flow.
+    meta: { disableToast: true },
   });
 };
 

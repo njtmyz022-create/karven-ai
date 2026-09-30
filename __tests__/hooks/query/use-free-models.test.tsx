@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,8 +13,10 @@ import {
 } from "#/api/backend-registry/active-store";
 import type { Backend } from "#/api/backend-registry/types";
 import { callCloudProxy } from "#/api/cloud/proxy";
+import { ActiveBackendProvider } from "#/contexts/active-backend-context";
 import {
   useDefaultModel,
+  useDefaultModelReady,
   useFreeModels,
   useHydrateFreeModels,
 } from "#/hooks/query/use-free-models";
@@ -29,17 +35,27 @@ const cloudBackend: Backend = {
 };
 
 const wrapper = ({ children }: { children: React.ReactNode }) => {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const [client] = React.useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      }),
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <ActiveBackendProvider>{children}</ActiveBackendProvider>
+    </QueryClientProvider>
+  );
 };
 
 function useHydratedFreeModelState() {
   useHydrateFreeModels();
+  const queryClient = useQueryClient();
   return {
+    queryClient,
     freeModels: useFreeModels(),
     defaultModel: useDefaultModel(),
+    defaultModelReady: useDefaultModelReady(),
   };
 }
 
@@ -98,5 +114,21 @@ describe("useHydrateFreeModels", () => {
       expect(result.current.freeModels.has("openhands/glm-5.2")).toBe(true),
     );
     expect(result.current.defaultModel).toBe("openhands/glm-5.2");
+  });
+
+  it("does not query model metadata before a backend is configured", async () => {
+    setRegisteredBackends([]);
+    setActiveSelection(null);
+
+    const { result } = renderHook(() => useHydratedFreeModelState(), {
+      wrapper,
+    });
+
+    const modelFlagsQuery = result.current.queryClient
+      .getQueryCache()
+      .getAll()[0];
+    expect(modelFlagsQuery?.state.status).toBe("pending");
+    expect(result.current.defaultModelReady).toBe(false);
+    expect(result.current.freeModels.size).toBe(0);
   });
 });
