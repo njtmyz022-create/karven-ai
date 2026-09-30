@@ -7,7 +7,7 @@
  *
  * Env:
  *   AUTOMATION_BASE_URL  Ingress origin (default http://localhost:8100)
- *   SESSION_API_KEY      X-Session-API-Key (default ~/.openhands/agent-canvas/api-key.txt)
+ *   SESSION_API_KEY      X-Session-API-Key (default ~/.karven/agent-canvas/api-key.txt)
  *   AUTOMATION_DB        SQLite path (default .tmp/automation/automations.db)
  */
 
@@ -30,7 +30,7 @@ const DB_PATH =
 const API_KEY =
   process.env.SESSION_API_KEY ||
   readFileSync(
-    join(homedir(), ".openhands/agent-canvas/api-key.txt"),
+    join(homedir(), ".karven/agent-canvas/api-key.txt"),
     "utf8",
   ).trim();
 

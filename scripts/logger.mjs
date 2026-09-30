@@ -18,14 +18,15 @@ import { join } from "node:path";
 import process from "node:process";
 
 // Mirror the state-directory logic from dev-safe.mjs so log files live
-// alongside all other agent-canvas runtime state (e.g. ~/.openhands/agent-canvas).
+// alongside all other Karven runtime state (e.g. ~/.karven/agent-canvas).
 // The same env var (OH_CANVAS_SAFE_STATE_DIR) overrides both.
 const stateDir =
   process.env.OH_CANVAS_SAFE_STATE_DIR ||
-  join(homedir(), ".openhands", "agent-canvas");
+  join(homedir(), ".karven", "agent-canvas");
 const logDir = join(stateDir, "logs");
 
 // Matches any ANSI CSI escape sequence (colors, cursor movement, etc.).
+// eslint-disable-next-line no-control-regex -- Strip terminal escape sequences from logs.
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 /**
@@ -57,8 +58,7 @@ async function createFileLogger() {
   try {
     mkdirSync(logDir, { recursive: true });
 
-    const DailyRotateFile =
-      DailyRotateFileMod.default ?? DailyRotateFileMod;
+    const DailyRotateFile = DailyRotateFileMod.default ?? DailyRotateFileMod;
     const fileTransport = new DailyRotateFile({
       dirname: logDir,
       filename: "agent-canvas.%DATE%.log",

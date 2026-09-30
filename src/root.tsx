@@ -52,6 +52,7 @@ import {
   COLOR_THEME_BOOTSTRAP_SCRIPT,
   readPersistedColorTheme,
 } from "#/themes/color-themes";
+import { IS_KARVEN_PRODUCT_BUILD, KARVEN_BRAND } from "#/config/brand";
 
 /** Applies the persisted palette before paint; useEffect lands a frame late. */
 function ColorThemeApplier() {
@@ -226,8 +227,8 @@ export const links: LinksFunction = () => [
 ];
 
 export const meta: MetaFunction = () => [
-  { title: "OpenHands" },
-  { name: "description", content: "Let's Start Building!" },
+  { title: KARVEN_BRAND.name },
+  { name: "description", content: `${KARVEN_BRAND.name} agent workspace` },
 ];
 
 export default function App() {
@@ -363,7 +364,7 @@ export default function App() {
     return (
       <>
         <FirstRunOnboardingScreen onClose={markCompleted} />
-        <TelemetryConsentBanner />
+        {!IS_KARVEN_PRODUCT_BUILD && <TelemetryConsentBanner />}
       </>
     );
   }
@@ -401,7 +402,7 @@ export default function App() {
   return (
     <>
       <Outlet />
-      <TelemetryConsentBanner />
+      {!IS_KARVEN_PRODUCT_BUILD && <TelemetryConsentBanner />}
     </>
   );
 }

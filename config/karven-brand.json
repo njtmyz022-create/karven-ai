@@ -1,0 +1,19 @@
+{
+  "brandName": "Karven AI",
+  "shortName": "Karven",
+  "companyName": "Karven",
+  "desktopProductName": "Karven AI",
+  "desktopAppId": "ai.karven.desktop",
+  "urls": {
+    "marketing": "",
+    "app": "",
+    "chat": "",
+    "api": "",
+    "auth": "",
+    "admin": "",
+    "docs": "",
+    "support": "",
+    "status": "",
+    "downloads": ""
+  }
+}

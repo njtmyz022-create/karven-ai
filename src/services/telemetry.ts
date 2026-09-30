@@ -32,6 +32,7 @@
  */
 
 import type { BootstrapConfig, CaptureResult, PostHog } from "posthog-js";
+import { IS_KARVEN_PRODUCT_BUILD, KARVEN_BRAND } from "#/config/brand";
 import { getLockedCloudAuthMode } from "#/api/agent-server-config";
 import defaults from "../../config/defaults.json";
 
@@ -61,22 +62,20 @@ const TELEMETRY_SESSION_KEY = "openhands-telemetry-session";
 const POSTHOG_INSTANCE_NAME = "agent-canvas";
 const POSTHOG_PAGEVIEW_CAPTURE_MODE = "history_change";
 
-// Unconfigured source builds use staging. Production release workflows pass
-// VITE_POSTHOG_API_KEY explicitly for both the app and library artifacts.
-const DEFAULT_POSTHOG_API_KEY: string =
-  (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
-  defaults.telemetry.posthogApiKey;
+// Analytics require explicit destination configuration; there is no inherited
+// upstream PostHog project or endpoint in Karven builds.
+const DEFAULT_POSTHOG_API_KEY: string = IS_KARVEN_PRODUCT_BUILD
+  ? KARVEN_BRAND.analytics.apiKey
+  : (import.meta.env.VITE_POSTHOG_API_KEY as string | undefined) ||
+    defaults.telemetry.posthogApiKey;
 
-// Default to OpenHands' reverse proxy to bypass ad blockers.
-// The proxy at z.openhands.dev routes to PostHog's US region.
-// Library consumers can override this with their own proxy or direct PostHog URL.
-const DEFAULT_POSTHOG_HOST =
-  import.meta.env.VITE_POSTHOG_HOST || "https://z.openhands.dev";
+const DEFAULT_POSTHOG_HOST = IS_KARVEN_PRODUCT_BUILD
+  ? KARVEN_BRAND.analytics.apiHost
+  : import.meta.env.VITE_POSTHOG_HOST || defaults.telemetry.posthogHost;
 
-// UI host is needed for PostHog features like toolbar to work correctly
-// when using a reverse proxy. Defaults to US region.
-const DEFAULT_POSTHOG_UI_HOST =
-  import.meta.env.VITE_POSTHOG_UI_HOST || "https://us.posthog.com";
+const DEFAULT_POSTHOG_UI_HOST = IS_KARVEN_PRODUCT_BUILD
+  ? KARVEN_BRAND.analytics.uiHost
+  : import.meta.env.VITE_POSTHOG_UI_HOST || defaults.telemetry.posthogUiHost;
 
 export interface TelemetryConfig {
   /** PostHog project key. Useful for precompiled library consumers. */
@@ -101,7 +100,8 @@ let posthogInstance: PostHog | null = null;
 let initializationPromise: Promise<PostHog | null> | null = null;
 let pendingBootstrap: BootstrapConfig | undefined;
 let telemetryConfig: TelemetryConfig = {};
-let telemetryDisabled = false;
+let telemetryDisabled =
+  IS_KARVEN_PRODUCT_BUILD && !KARVEN_BRAND.analytics.enabled;
 
 /** Deployment-level opt-out injected by static-server.mjs (see file header). */
 function isRuntimeDoNotTrackEnabled(): boolean {
@@ -244,6 +244,12 @@ function propertiesEqual(
  * Passing false disables telemetry and install tracking for embedded hosts.
  */
 export function configureTelemetry(config: TelemetryConfiguration): void {
+  if (IS_KARVEN_PRODUCT_BUILD && !KARVEN_BRAND.analytics.enabled) {
+    telemetryDisabled = true;
+    posthogInstance?.opt_out_capturing();
+    notifyTelemetryConsentListeners();
+    return;
+  }
   if (config === false) {
     if (telemetryDisabled) return;
     telemetryDisabled = true;
@@ -274,11 +280,12 @@ export function configureTelemetry(config: TelemetryConfiguration): void {
 function getResolvedTelemetryConfig(): Required<TelemetryConfig> | null {
   if (isTelemetryHardDisabled()) return null;
 
-  return {
+  const config = {
     apiKey: telemetryConfig.apiKey || DEFAULT_POSTHOG_API_KEY,
     apiHost: telemetryConfig.apiHost || DEFAULT_POSTHOG_HOST,
     uiHost: telemetryConfig.uiHost || DEFAULT_POSTHOG_UI_HOST,
   };
+  return config.apiKey && config.apiHost ? config : null;
 }
 
 /**
@@ -296,6 +303,8 @@ async function getPostHog(): Promise<PostHog | null> {
   if (!isBrowser()) {
     return null;
   }
+
+  if (IS_KARVEN_PRODUCT_BUILD && !KARVEN_BRAND.analytics.enabled) return null;
 
   if (posthogInstance) {
     return posthogInstance;

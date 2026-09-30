@@ -1,6 +1,6 @@
 {
-  "name": "agent-canvas",
-  "productName": "OpenHands Agent Canvas",
+  "name": "karven-ai-desktop",
+  "productName": "Karven AI",
   "version": "1.0.0",
   "private": true,
   "main": "main.mjs"

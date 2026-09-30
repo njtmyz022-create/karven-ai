@@ -65,6 +65,7 @@ import { cp, rm } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import karvenBrand from "./config/karven-brand.json" with { type: "json" };
 
 // Arch the desktop runtimes are bundled for — "universal" (macOS) or a
 // single arch. The per-arch layouts live in scripts/download-arch-utils.mjs;
@@ -134,7 +135,9 @@ async function stripBundledNodeModules(context) {
     let sizeMb = null;
     try {
       sizeMb = Math.round(getDirSizeBytes(nm) / (1024 * 1024));
-    } catch {}
+    } catch {
+      // Size reporting is optional; packaging still proceeds with cleanup.
+    }
 
     await rm(nm, { recursive: true, force: true });
 
@@ -306,7 +309,9 @@ function getDirSizeBytes(dir) {
       } else {
         try {
           total += statSync(p).size;
-        } catch {}
+        } catch {
+          // A disappearing file should not block best-effort size reporting.
+        }
       }
     }
   }
@@ -315,9 +320,9 @@ function getDirSizeBytes(dir) {
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
-  appId: "dev.openhands.agent-canvas",
-  productName: "OpenHands Agent Canvas",
-  copyright: "Copyright © 2025 OpenHands contributors",
+  appId: karvenBrand.desktopAppId,
+  productName: karvenBrand.desktopProductName,
+  copyright: `Copyright © ${karvenBrand.companyName}`,
 
   // Stamp the packaged app with the released version (see rootPackageJson
   // note above).
@@ -427,9 +432,7 @@ const config = {
     target: [
       {
         target: "dmg",
-        arch: [
-          ELECTRON_ARCH ?? (process.arch === "arm64" ? "arm64" : "x64"),
-        ],
+        arch: [ELECTRON_ARCH ?? (process.arch === "arm64" ? "arm64" : "x64")],
       },
     ],
     // Universal merge whitelist: the per-arch uv/node runtime binaries are
@@ -445,16 +448,16 @@ const config = {
   },
 
   dmg: {
-    title: "OpenHands Agent Canvas",
+    title: karvenBrand.desktopProductName,
     contents: [
       { x: 130, y: 220 },
       { x: 410, y: 220, type: "link", path: "/Applications" },
     ],
     window: { width: 540, height: 380 },
-    // Default is "OpenHands Agent Canvas-<version>-<arch>.dmg"; GitHub release
+    // Release artifact names are Karven-owned and platform neutral.
     // assets mangle spaces, so keep the asset name literal (matches the nsis
     // convention). ${version}/${arch}/${ext} are electron-builder macros.
-    artifactName: "OpenHands-Agent-Canvas-${version}-${arch}.${ext}",
+    artifactName: "Karven-AI-${version}-${arch}.${ext}",
   },
 
   // ── Windows ────────────────────────────────────────────────────────────────
@@ -471,10 +474,9 @@ const config = {
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    // The default artifact name is "OpenHands Agent Canvas Setup <version>.exe";
-    // GitHub release assets mangle spaces, so ship a space-free name.
+    // Keep the customer-facing installer name stable across release hosts.
     // ${version}/${ext} are electron-builder macros, not JS interpolation.
-    artifactName: "OpenHands-Agent-Canvas-Setup-${version}.${ext}",
+    artifactName: "Karven-AI-Setup-${version}.${ext}",
   },
 
   // ── Linux ──────────────────────────────────────────────────────────────────
@@ -488,7 +490,9 @@ const config = {
     // fpm-backed targets (deb) require a maintainer with an email address;
     // electron/package.json carries no author, so set it here. Without this
     // the deb step fails with "Please specify author 'email'".
-    maintainer: "OpenHands <contact@all-hands.dev>",
+    ...(process.env.KARVEN_DEBIAN_MAINTAINER
+      ? { maintainer: process.env.KARVEN_DEBIAN_MAINTAINER }
+      : {}),
   },
 };
 

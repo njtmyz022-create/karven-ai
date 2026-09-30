@@ -24,6 +24,7 @@ import { useLlmProfiles } from "#/hooks/query/use-llm-profiles";
 import { useFreeModels } from "#/hooks/query/use-free-models";
 import { useActiveBackend } from "#/contexts/active-backend-context";
 import { formatModelNameForDisplay } from "#/utils/format-model-name";
+import { IS_KARVEN_PRODUCT_BUILD } from "#/config/brand";
 
 const AUTOMATIC_TITLE_LLM_PROFILE_KEY = "__automatic__";
 
@@ -93,9 +94,11 @@ export function AppSettingsScreen() {
     )?.value;
     const language = languageValue || DEFAULT_SETTINGS.language;
 
-    const enableAnalytics = isCloudBackend
-      ? true
-      : formData.get("enable-analytics-switch")?.toString() === "on";
+    const enableAnalytics =
+      !IS_KARVEN_PRODUCT_BUILD &&
+      (isCloudBackend
+        ? true
+        : formData.get("enable-analytics-switch")?.toString() === "on");
     const enableSoundNotifications =
       formData.get("enable-sound-notifications-switch")?.toString() === "on";
 
@@ -109,7 +112,10 @@ export function AppSettingsScreen() {
     saveSettings(
       {
         language,
-        ...(!isCloudBackend && { user_consents_to_analytics: enableAnalytics }),
+        ...(!isCloudBackend &&
+          !IS_KARVEN_PRODUCT_BUILD && {
+            user_consents_to_analytics: enableAnalytics,
+          }),
         enable_sound_notifications: enableSoundNotifications,
         git_user_name: gitUserName,
         git_user_email: gitUserEmail,
@@ -198,22 +204,24 @@ export function AppSettingsScreen() {
 
           <ThemeInput />
 
-          <SettingsSwitch
-            testId="enable-analytics-switch"
-            name={isCloudBackend ? undefined : "enable-analytics-switch"}
-            defaultIsToggled={
-              isCloudBackend
-                ? true
-                : (settings.user_consents_to_analytics ?? true)
-            }
-            isToggled={isCloudBackend ? true : undefined}
-            isDisabled={isCloudBackend}
-            onToggle={
-              isCloudBackend ? undefined : checkIfAnalyticsSwitchHasChanged
-            }
-          >
-            {t(I18nKey.ANALYTICS$SEND_ANONYMOUS_DATA)}
-          </SettingsSwitch>
+          {!IS_KARVEN_PRODUCT_BUILD && (
+            <SettingsSwitch
+              testId="enable-analytics-switch"
+              name={isCloudBackend ? undefined : "enable-analytics-switch"}
+              defaultIsToggled={
+                isCloudBackend
+                  ? true
+                  : (settings.user_consents_to_analytics ?? true)
+              }
+              isToggled={isCloudBackend ? true : undefined}
+              isDisabled={isCloudBackend}
+              onToggle={
+                isCloudBackend ? undefined : checkIfAnalyticsSwitchHasChanged
+              }
+            >
+              {t(I18nKey.ANALYTICS$SEND_ANONYMOUS_DATA)}
+            </SettingsSwitch>
+          )}
 
           <SettingsSwitch
             testId="enable-sound-notifications-switch"

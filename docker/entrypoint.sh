@@ -50,13 +50,13 @@
 #   FILE_STORE             – Storage backend for automation tarballs (default: local).
 #                          Without this the automation backend may fall back to
 #                          S3/GCS which fails without cloud credentials.
-#   LOCAL_STORAGE_PATH     – Directory for local file storage (default: ~/.openhands/storage)
+#   LOCAL_STORAGE_PATH     – Directory for local file storage (default: ~/.karven/storage)
 #   AUTOMATION_BASE_URL    – Publicly-reachable base URL for the automation
 #                          service, used in callback URLs and injected into
 #                          sandboxes (default: http://127.0.0.1:$PORT).
 #                          Override in production when the external URL differs.
 #   AUTOMATION_WORKSPACE_BASE – Directory for automation run workspaces
-#                          (default: ~/.openhands/workspaces)
+#                          (default: ~/.karven/workspaces)
 #   Any agent-server or automation env vars are passed through.
 # ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
@@ -171,11 +171,11 @@ VSCODE_ROUTE="${VSCODE_BASE_PATH}=http://127.0.0.1:${VSCODE_PORT}"
 
 # Persistence paths — keep settings, conversations, bash history under a
 # single well-known directory that the VOLUME directive exposes.
-OPENHANDS_DIR="${HOME}/.openhands"
-STATE_DIR="${OPENHANDS_DIR}/${CONFIG_STATE_SUBDIR:-agent-canvas}"
-export OH_PERSISTENCE_DIR="${OH_PERSISTENCE_DIR:-${OPENHANDS_DIR}}"
-export OH_CONVERSATIONS_PATH="${OH_CONVERSATIONS_PATH:-${OPENHANDS_DIR}/${CONFIG_CONVERSATIONS:-agent-canvas/conversations}}"
-export OH_BASH_EVENTS_DIR="${OH_BASH_EVENTS_DIR:-${OPENHANDS_DIR}/${CONFIG_BASH_EVENTS:-agent-canvas/bash_events}}"
+KARVEN_STATE_ROOT="${HOME}/.karven"
+STATE_DIR="${KARVEN_STATE_ROOT}/${CONFIG_STATE_SUBDIR:-agent-canvas}"
+export OH_PERSISTENCE_DIR="${OH_PERSISTENCE_DIR:-${KARVEN_STATE_ROOT}}"
+export OH_CONVERSATIONS_PATH="${OH_CONVERSATIONS_PATH:-${KARVEN_STATE_ROOT}/${CONFIG_CONVERSATIONS:-agent-canvas/conversations}}"
+export OH_BASH_EVENTS_DIR="${OH_BASH_EVENTS_DIR:-${KARVEN_STATE_ROOT}/${CONFIG_BASH_EVENTS:-agent-canvas/bash_events}}"
 
 # OH_SECRET_KEY is required for settings/secrets encryption. Without it the
 # agent-server refuses to return encrypted secrets → conversation creation
@@ -226,7 +226,11 @@ export AUTOMATION_LOCAL_API_KEY="${AUTOMATION_LOCAL_API_KEY:-${EFFECTIVE_SESSION
 export AUTOMATION_AGENT_SERVER_API_KEY="${AUTOMATION_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
 export AUTOMATION_KV_SECRET="${AUTOMATION_KV_SECRET:-${EFFECTIVE_SESSION_KEY}}"
 export OPENHANDS_REMOTE_WS_READY_REQUIRED="${OPENHANDS_REMOTE_WS_READY_REQUIRED:-false}"
-if [ -z "${AUTOMATION_POSTHOG_API_KEY:-}" ]; then
+if [ "${VITE_DO_NOT_TRACK:-}" = "1" ] || [ "${DO_NOT_TRACK:-}" = "1" ]; then
+  export DO_NOT_TRACK="1"
+  unset AUTOMATION_POSTHOG_API_KEY OH_TELEMETRY_POSTHOG_API_KEY OH_TELEMETRY_EXPORTER
+fi
+if [ "${DO_NOT_TRACK:-}" != "1" ] && [ -z "${AUTOMATION_POSTHOG_API_KEY:-}" ]; then
   if [ -n "${VITE_POSTHOG_API_KEY:-}" ]; then
     export AUTOMATION_POSTHOG_API_KEY="$VITE_POSTHOG_API_KEY"
   elif [ "${VITE_DO_NOT_TRACK:-}" != "1" ]; then
@@ -241,11 +245,7 @@ fi
 # OH_TELEMETRY_* variables, so mirror the same Canvas/PostHog defaults used by
 # the frontend and automation backend while preserving explicit operator
 # overrides. Consent stays in persisted settings, where the backend/UI owns it.
-if [ "${VITE_DO_NOT_TRACK:-}" = "1" ]; then
-  export DO_NOT_TRACK="${DO_NOT_TRACK:-1}"
-fi
-
-if [ -z "${OH_TELEMETRY_POSTHOG_API_KEY:-}" ]; then
+if [ "${DO_NOT_TRACK:-}" != "1" ] && [ -z "${OH_TELEMETRY_POSTHOG_API_KEY:-}" ]; then
   if [ -n "${VITE_POSTHOG_API_KEY:-}" ]; then
     export OH_TELEMETRY_POSTHOG_API_KEY="$VITE_POSTHOG_API_KEY"
   elif [ "${DO_NOT_TRACK:-}" != "1" ]; then
@@ -318,7 +318,7 @@ log "Starting automation server on port $AUTOMATION_PORT..."
 # to a cloud provider (S3/GCS) which will fail without credentials, causing
 # tarball-based presets (preset/prompt, preset/plugin) to silently error.
 export FILE_STORE="${FILE_STORE:-local}"
-export LOCAL_STORAGE_PATH="${LOCAL_STORAGE_PATH:-${OPENHANDS_DIR}/storage}"
+export LOCAL_STORAGE_PATH="${LOCAL_STORAGE_PATH:-${KARVEN_STATE_ROOT}/storage}"
 mkdir -p "$LOCAL_STORAGE_PATH"
 
 # AUTOMATION_BASE_URL — the publicly-reachable base URL for the automation
@@ -327,14 +327,14 @@ mkdir -p "$LOCAL_STORAGE_PATH"
 export AUTOMATION_BASE_URL="${AUTOMATION_BASE_URL:-http://127.0.0.1:${PORT}}"
 
 # AUTOMATION_WORKSPACE_BASE — where automation runs unpack tarballs.
-export AUTOMATION_WORKSPACE_BASE="${AUTOMATION_WORKSPACE_BASE:-${OPENHANDS_DIR}/workspaces}"
+export AUTOMATION_WORKSPACE_BASE="${AUTOMATION_WORKSPACE_BASE:-${KARVEN_STATE_ROOT}/workspaces}"
 mkdir -p "$AUTOMATION_WORKSPACE_BASE"
 
 # Default to SQLite so the automation server works out of the box without
 # an external PostgreSQL instance. Users can override AUTOMATION_DB_URL to
 # point at a real Postgres for production deployments.
 if [ -z "${AUTOMATION_DB_URL:-}" ]; then
-  AUTOMATION_DB_FILE="${OPENHANDS_DIR}/${CONFIG_AUTOMATION_DB:-automation/automations.db}"
+  AUTOMATION_DB_FILE="${KARVEN_STATE_ROOT}/${CONFIG_AUTOMATION_DB:-automation/automations.db}"
   mkdir -p "$(dirname "$AUTOMATION_DB_FILE")"
   export AUTOMATION_DB_URL="sqlite+aiosqlite:///${AUTOMATION_DB_FILE}"
   log "Using SQLite database: $AUTOMATION_DB_URL"

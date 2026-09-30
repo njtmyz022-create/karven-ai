@@ -43,8 +43,12 @@ COPY . .
 # Canvas under the Cloud subpath instead of a dedicated hostname.
 ARG VITE_POSTHOG_API_KEY=""
 ARG VITE_BASE_PATH="/canvas"
+ARG VITE_KARVEN_PRODUCT="1"
+ARG VITE_DO_NOT_TRACK="1"
 ENV VITE_POSTHOG_API_KEY=${VITE_POSTHOG_API_KEY}
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV VITE_KARVEN_PRODUCT=${VITE_KARVEN_PRODUCT}
+ENV VITE_DO_NOT_TRACK=${VITE_DO_NOT_TRACK}
 RUN npm run build
 
 # ── Stage 1b: Generate shell-sourceable defaults from config/defaults.json ──
@@ -80,6 +84,8 @@ ARG OPENHANDS_BUILD_GIT_SHA=unknown
 ARG OPENHANDS_BUILD_GIT_REF=unknown
 ARG VITE_BASE_PATH="/canvas"
 ARG VITE_POSTHOG_API_KEY=""
+ARG VITE_KARVEN_PRODUCT="1"
+ARG VITE_DO_NOT_TRACK="1"
 
 ARG AGENT_CANVAS_VERSION=dev
 LABEL org.opencontainers.image.title="agent-canvas"
@@ -92,6 +98,8 @@ ENV AGENT_CANVAS_BUILD_GIT_SHA=${OPENHANDS_BUILD_GIT_SHA}
 ENV AGENT_CANVAS_BUILD_GIT_REF=${OPENHANDS_BUILD_GIT_REF}
 ENV AGENT_CANVAS_BASE_PATH=${VITE_BASE_PATH}
 ENV VITE_POSTHOG_API_KEY=${VITE_POSTHOG_API_KEY}
+ENV VITE_KARVEN_PRODUCT=${VITE_KARVEN_PRODUCT}
+ENV VITE_DO_NOT_TRACK=${VITE_DO_NOT_TRACK}
 
 USER root
 
@@ -169,20 +177,20 @@ RUN chmod +x /opt/agent-canvas/entrypoint.sh
 # Pre-create persistence directories with correct ownership so the
 # openhands user can write to them even when Docker creates anonymous
 # volumes (which default to root).
-RUN mkdir -p /home/openhands/.openhands/agent-canvas/conversations \
-             /home/openhands/.openhands/agent-canvas/bash_events \
-             /home/openhands/.openhands/automation \
+RUN mkdir -p /home/openhands/.karven/agent-canvas/conversations \
+             /home/openhands/.karven/agent-canvas/bash_events \
+             /home/openhands/.karven/automation \
              /projects && \
-    chown -R openhands:openhands /home/openhands/.openhands /projects
+    chown -R openhands:openhands /home/openhands/.karven /projects
 
 USER openhands
 
 # Persistence volumes:
-#   /home/openhands/.openhands — settings, secrets, conversations, automation DB
+#   /home/openhands/.karven — Karven settings, secrets, conversations, automation DB
 #   /projects                  — user code the agent can read/edit
 # Bind-mount these for data to survive container restarts:
-#   docker run -v ~/.openhands:/home/openhands/.openhands -v ~/projects:/projects ...
-VOLUME ["/home/openhands/.openhands", "/projects"]
+#   docker run -v ~/.karven:/home/openhands/.karven -v ~/projects:/projects ...
+VOLUME ["/home/openhands/.karven", "/projects"]
 
 # The entrypoint starts all services and the ingress proxy.
 # Port 8000 is the unified entry point.

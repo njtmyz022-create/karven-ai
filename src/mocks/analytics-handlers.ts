@@ -1,13 +1,8 @@
 import { http, HttpResponse } from "msw";
 
-// Block both the direct PostHog ingestion endpoint and the OpenHands reverse
-// proxy (z.openhands.dev) used by the library telemetry service so mock-mode
-// builds never send analytics events to PostHog.
+// Mock builds must not bake a vendor analytics destination into the customer
+// bundle. Match the ingestion path independently of the configured host; the
+// Karven product build keeps telemetry disabled unless explicitly configured.
 export const ANALYTICS_HANDLERS = [
-  http.post("https://us.i.posthog.com/e", async () =>
-    HttpResponse.json(null, { status: 200 }),
-  ),
-  http.post("https://z.openhands.dev/*", async () =>
-    HttpResponse.json(null, { status: 200 }),
-  ),
+  http.post("*/e", async () => HttpResponse.json(null, { status: 200 })),
 ];
