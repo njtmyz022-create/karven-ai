@@ -170,7 +170,8 @@ VSCODE_ROUTE="${VSCODE_BASE_PATH}=http://127.0.0.1:${VSCODE_PORT}"
 # <<< vscode-config
 
 # Persistence paths — keep settings, conversations, bash history under a
-# single well-known directory that the VOLUME directive exposes.
+# single well-known directory. Managed deployments should mount a persistent
+# volume at this path so generated keys and conversations survive restarts.
 KARVEN_STATE_ROOT="${HOME}/.karven"
 STATE_DIR="${KARVEN_STATE_ROOT}/${CONFIG_STATE_SUBDIR:-agent-canvas}"
 export OH_PERSISTENCE_DIR="${OH_PERSISTENCE_DIR:-${KARVEN_STATE_ROOT}}"
