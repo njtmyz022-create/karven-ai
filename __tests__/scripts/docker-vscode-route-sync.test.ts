@@ -36,9 +36,9 @@ const defaults = JSON.parse(read("config/defaults.json")) as {
 const entrypoint = read("docker/entrypoint.sh");
 const dockerfile = read("docker/Dockerfile");
 
-// Both static-server invocations (the normal one and the --auth-required
-// public-mode one started when PUBLIC_MODE_PORT is set) must carry the route;
-// the public-mode server is what the auth-mode E2E suite drives.
+// The primary static server is public and requires auth by default. The optional
+// PUBLIC_MODE_PORT server is a second auth-only instance used by E2E coverage;
+// unlike the primary service it must not route or advertise the editor.
 function staticServerInvocations(): string[] {
   return entrypoint
     .split("node /opt/agent-canvas/static-server.mjs")
@@ -168,9 +168,10 @@ describe("docker editor route", () => {
     // browser-navigable URL on the origin whose whole purpose is to exercise
     // the unauthenticated case.
     const publicMode = staticServerInvocations().find((invocation) =>
-      invocation.includes("--auth-required"),
+      invocation.includes('--port "$PUBLIC_MODE_PORT"'),
     );
     expect(publicMode).toBeDefined();
+    expect(publicMode).toContain("--auth-required");
     expect(publicMode).not.toContain("VSCODE_ROUTE");
     // And it must not advertise one either. Omitting only the route would
     // leave the control rendering — the agent-server this instance shares with

@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 6974)
+Total output lines: 531
+
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
 # agent-canvas all-in-one entrypoint
@@ -7,7 +10,9 @@
 #   2. Automation     on port $AUTOMATION_PORT     (default 18001)
 #   3. Static server  on port $PORT               (default 8000)
 #      Routes /api/automation/* → automation, /api/* → agent-server,
-#      and serves the frontend static build for everything else.
+#      and serves the frontend static build for everything else. Public
+#      deployments require the visitor to enter a session key; the key is
+#      never embedded into the page by default.
 #   4. (Optional) Public-mode static server on $PUBLIC_MODE_PORT
 #      Same frontend, but with --auth-required (no baked session key).
 #      Used by auth-mode E2E tests. Only started when PUBLIC_MODE_PORT is set.
@@ -30,8 +35,9 @@
 #                          take precedence over these aliases; whichever is set,
 #                          one effective pair drives both the editor process and
 #                          the proxy route.
-#   PUBLIC_MODE_PORT     – If set, starts a second static server on this port
-#                          with --auth-required (no session key injected)
+#   PUBLIC_MODE_PORT     – Optional additional static server on this port
+#                          with --auth-required (no session key injected).
+#                          The main public entry point already requires auth.
 #   AGENT_CANVAS_ALLOW_LAN_SESSION_KEY – Set to true only when the published
 #                          host port is restricted to loopback and you accept
 #                          embedding the session key in the served HTML
@@ -161,172 +167,7 @@ case "$VSCODE_PATH_SEGMENT" in
     exit 1
     ;;
   .|..)
-    log_error "VSCODE_BASE_PATH must not be a relative path segment (got '$VSCODE_BASE_PATH'). Use a prefix such as /vscode."
-    exit 1
-    ;;
-  *[!A-Za-z0-9._-]*)
-    log_error "VSCODE_BASE_PATH may only contain letters, digits, '.', '_' and '-' (got '$VSCODE_BASE_PATH'). Use a prefix such as /vscode."
-    exit 1
-    ;;
-esac
-for reserved in /api /sockets /server_info /alive /health /ready /docs /redoc /openapi.json "${AGENT_CANVAS_BASE_PATH:-}"; do
-  if [ -n "$reserved" ] && [ "$VSCODE_BASE_PATH" = "$reserved" ]; then
-    log_error "VSCODE_BASE_PATH '$VSCODE_BASE_PATH' collides with an existing route and would take it over. Set a different prefix, such as /vscode."
-    exit 1
-  fi
-done
-
-# The port ends up in a proxy target URL, so a non-numeric value fails at the
-# first editor request instead of at startup. Catch it here.
-case "$VSCODE_PORT" in
-  ''|*[!0-9]*)
-    log_error "VSCODE_PORT must be a number (got '$VSCODE_PORT')."
-    exit 1
-    ;;
-esac
-
-export OH_VSCODE_PORT="$VSCODE_PORT"
-export OH_VSCODE_BASE_PATH="$VSCODE_BASE_PATH"
-# The single route string every static-server instance registers. Derived from
-# the exported pair above so the advertised URL and the route cannot diverge.
-VSCODE_ROUTE="${VSCODE_BASE_PATH}=http://127.0.0.1:${VSCODE_PORT}"
-# <<< vscode-config
-
-# Persistence paths — keep settings, conversations, bash history under a
-# single well-known directory. Managed deployments should mount a persistent
-# volume at this path so generated keys and conversations survive restarts.
-KARVEN_STATE_ROOT="${HOME}/.karven"
-STATE_DIR="${KARVEN_STATE_ROOT}/${CONFIG_STATE_SUBDIR:-agent-canvas}"
-export OH_PERSISTENCE_DIR="${OH_PERSISTENCE_DIR:-${KARVEN_STATE_ROOT}}"
-export OH_CONVERSATIONS_PATH="${OH_CONVERSATIONS_PATH:-${KARVEN_STATE_ROOT}/${CONFIG_CONVERSATIONS:-agent-canvas/conversations}}"
-export OH_BASH_EVENTS_DIR="${OH_BASH_EVENTS_DIR:-${KARVEN_STATE_ROOT}/${CONFIG_BASH_EVENTS:-agent-canvas/bash_events}}"
-
-# OH_SECRET_KEY is required for settings/secrets encryption. Without it the
-# agent-server refuses to return encrypted secrets → conversation creation
-# fails with a 503.  Auto-generate and persist (just like the session API key)
-# so the image never runs with a known default.
-SECRET_KEY_FILE="${STATE_DIR}/secret-key.txt"
-if [ -z "${OH_SECRET_KEY:-}" ]; then
-  if [ -f "$SECRET_KEY_FILE" ]; then
-    OH_SECRET_KEY="$(cat "$SECRET_KEY_FILE")"
-  else
-    OH_SECRET_KEY="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-    mkdir -p "$(dirname "$SECRET_KEY_FILE")"
-    printf '%s' "$OH_SECRET_KEY" > "$SECRET_KEY_FILE"
-    chmod 600 "$SECRET_KEY_FILE"
-    log "Generated OH_SECRET_KEY (persisted to $SECRET_KEY_FILE)"
-  fi
-fi
-export OH_SECRET_KEY
-
-# API key — generate one if not provided so the image doesn't run wide-open
-# by default. LOCAL_BACKEND_API_KEY is the single user-facing env var.
-# Persisted so restarts reuse the same key.
-API_KEY_FILE="${STATE_DIR}/api-key.txt"
-
-if [ -z "${LOCAL_BACKEND_API_KEY:-}" ] && [ -z "${OH_SESSION_API_KEYS_0:-}" ]; then
-  if [ -f "$API_KEY_FILE" ]; then
-    LOCAL_BACKEND_API_KEY="$(cat "$API_KEY_FILE")"
-  else
-    LOCAL_BACKEND_API_KEY="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-    mkdir -p "$(dirname "$API_KEY_FILE")"
-    printf '%s' "$LOCAL_BACKEND_API_KEY" > "$API_KEY_FILE"
-    chmod 600 "$API_KEY_FILE"
-    log "Generated API key (persisted to $API_KEY_FILE)"
-  fi
-  export OH_SESSION_API_KEYS_0="$LOCAL_BACKEND_API_KEY"
-fi
-
-# Both backends share the same API key value and the same `X-Session-API-Key`
-# header for authentication.  Default OPENHANDS_AUTOMATION_API_KEY to the
-# API key so a single credential secures the whole stack.
-EFFECTIVE_SESSION_KEY="${OH_SESSION_API_KEYS_0:-${LOCAL_BACKEND_API_KEY:-}}"
-if [ -z "$EFFECTIVE_SESSION_KEY" ]; then
-  log "ERROR: No session API key available — cannot configure automation auth"
-  exit 1
-fi
-export OPENHANDS_AUTOMATION_API_KEY="${OPENHANDS_AUTOMATION_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
-export AUTOMATION_LOCAL_API_KEY="${AUTOMATION_LOCAL_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
-export AUTOMATION_AGENT_SERVER_API_KEY="${AUTOMATION_AGENT_SERVER_API_KEY:-${EFFECTIVE_SESSION_KEY}}"
-export AUTOMATION_KV_SECRET="${AUTOMATION_KV_SECRET:-${EFFECTIVE_SESSION_KEY}}"
-export OPENHANDS_REMOTE_WS_READY_REQUIRED="${OPENHANDS_REMOTE_WS_READY_REQUIRED:-false}"
-if [ "${VITE_DO_NOT_TRACK:-}" = "1" ] || [ "${DO_NOT_TRACK:-}" = "1" ]; then
-  export DO_NOT_TRACK="1"
-  unset AUTOMATION_POSTHOG_API_KEY OH_TELEMETRY_POSTHOG_API_KEY OH_TELEMETRY_EXPORTER
-fi
-if [ "${DO_NOT_TRACK:-}" != "1" ] && [ -z "${AUTOMATION_POSTHOG_API_KEY:-}" ]; then
-  if [ -n "${VITE_POSTHOG_API_KEY:-}" ]; then
-    export AUTOMATION_POSTHOG_API_KEY="$VITE_POSTHOG_API_KEY"
-  elif [ "${VITE_DO_NOT_TRACK:-}" != "1" ]; then
-    export AUTOMATION_POSTHOG_API_KEY="${CONFIG_POSTHOG_API_KEY:-}"
-  fi
-fi
-if [ -n "${AUTOMATION_POSTHOG_API_KEY:-}" ]; then
-  export AUTOMATION_POSTHOG_HOST="${AUTOMATION_POSTHOG_HOST:-${VITE_POSTHOG_HOST:-${CONFIG_POSTHOG_HOST:-}}}"
-fi
-
-# Configure product analytics for the agent-server. The SDK uses its own
-# OH_TELEMETRY_* variables, so mirror the same Canvas/PostHog defaults used by
-# the frontend and automation backend while preserving explicit operator
-# overrides. Consent stays in persisted settings, where the backend/UI owns it.
-if [ "${DO_NOT_TRACK:-}" != "1" ] && [ -z "${OH_TELEMETRY_POSTHOG_API_KEY:-}" ]; then
-  if [ -n "${VITE_POSTHOG_API_KEY:-}" ]; then
-    export OH_TELEMETRY_POSTHOG_API_KEY="$VITE_POSTHOG_API_KEY"
-  elif [ "${DO_NOT_TRACK:-}" != "1" ]; then
-    export OH_TELEMETRY_POSTHOG_API_KEY="${CONFIG_POSTHOG_API_KEY:-}"
-  fi
-fi
-
-if [ -z "${OH_TELEMETRY_EXPORTER:-}" ] && [ -n "${OH_TELEMETRY_POSTHOG_API_KEY:-}" ]; then
-  export OH_TELEMETRY_EXPORTER="posthog"
-fi
-
-if [ "${OH_TELEMETRY_EXPORTER:-}" = "posthog" ] && [ -n "${OH_TELEMETRY_POSTHOG_API_KEY:-}" ]; then
-  export OH_TELEMETRY_POSTHOG_HOST="${OH_TELEMETRY_POSTHOG_HOST:-${VITE_POSTHOG_HOST:-${CONFIG_POSTHOG_HOST:-}}}"
-fi
-
-# AGENT_SERVER_URL — needed by automation sandbox callbacks.
-export AGENT_SERVER_URL="${AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
-
-# AUTOMATION_AGENT_SERVER_URL — the URL the automation service uses to reach
-# the agent-server REST API (tarball upload, bash dispatch, auth key minting).
-# When set, ServiceSettings.is_local_mode returns True, enabling local API key
-# authentication. Without this, the automation server falls back to validating
-# keys against the OpenHands cloud API (app.all-hands.dev), which returns 401
-# for locally-generated session keys.
-export AUTOMATION_AGENT_SERVER_URL="${AUTOMATION_AGENT_SERVER_URL:-http://127.0.0.1:${AGENT_SERVER_PORT}}"
-
-# Keep the legacy canvas_ui_tool module importable when the agent-server restores
-# conversations whose persisted metadata still references its module qualname.
-# It is also imported at startup below (--import-modules) so its builtin
-# FinishTool registration lets automation runs resolve the tool on their
-# remote conversations (see the note at the bottom of tools/canvas_ui_tool.py).
-export OH_EXTRA_PYTHON_PATH="${OH_EXTRA_PYTHON_PATH:-/opt/agent-canvas/tools}"
-AGENT_SERVER_IMPORT_MODULES="canvas_ui_tool"
-
-# Track child PIDs so we can clean up on exit.
-PIDS=()
-
-cleanup() {
-  log "Shutting down..."
-  for pid in "${PIDS[@]}"; do
-    kill "$pid" 2>/dev/null || true
-  done
-  wait 2>/dev/null || true
-  exit 0
-}
-trap cleanup EXIT SIGINT SIGTERM
-
-# ── 1. Start Agent Server ────────────────────────────────────────────────────
-log "Starting agent-server on port $AGENT_SERVER_PORT..."
-
-if command -v openhands-agent-server >/dev/null 2>&1; then
-  # Binary build (production image)
-  openhands-agent-server --port "$AGENT_SERVER_PORT" \
-    --import-modules "$AGENT_SERVER_IMPORT_MODULES" &
-elif [ -x /agent-server/.venv/bin/python ]; then
-  # Source build (development image)
-  /agent-server/.venv/bin/python -m openhands.agent_server --port "$AGENT_SERVER_PORT" \
+    log_error "VSCODE_BASE_PATH must not be a relative path segment (got '$VSCODE_BASE_PAT…1974 tokens truncated…hon -m openhands.agent_server --port "$AGENT_SERVER_PORT" \
     --import-modules "$AGENT_SERVER_IMPORT_MODULES" &
 else
   log_error "Cannot find agent-server binary or source venv."
@@ -422,19 +263,26 @@ RUNTIME_SERVICES_INFO="$(node /opt/agent-canvas/runtime-services-info.mjs \
 # every interface, session-key injection stays disabled unless the operator
 # explicitly opts in.
 # >>> docker-session-key-policy: extracted by the regression test below.
+# The Docker image binds the main entry point to all interfaces, and Railway
+# publishes it publicly. Require a session key in the browser by default. Do
+# not pass the key to the static server in this mode: it only needs to be
+# validated by the agent server. The explicit LAN override is for a trusted,
+# loopback-only deployment and must never be enabled on a public host.
+STATIC_SERVER_AUTH_ARGS=(--auth-required)
 STATIC_SERVER_SESSION_KEY_ARGS=()
 if [ "${AGENT_CANVAS_ALLOW_LAN_SESSION_KEY:-false}" = "true" ]; then
   log "WARNING: Embedding the session API key in frontend HTML; publish port $PORT on host loopback only."
-  STATIC_SERVER_SESSION_KEY_ARGS+=(--allow-lan-session-key)
+  STATIC_SERVER_AUTH_ARGS=()
+  STATIC_SERVER_SESSION_KEY_ARGS=(--allow-lan-session-key --session-api-key "$EFFECTIVE_SESSION_KEY")
 fi
 # <<< docker-session-key-policy
 node /opt/agent-canvas/static-server.mjs \
   --port "$PORT" \
   --host :: \
+  "${STATIC_SERVER_AUTH_ARGS[@]}" \
   "${STATIC_SERVER_SESSION_KEY_ARGS[@]}" \
   --dir /opt/agent-canvas/frontend \
   --base-path "$AGENT_CANVAS_BASE_PATH" \
-  --session-api-key "$EFFECTIVE_SESSION_KEY" \
   --runtime-services-info "$RUNTIME_SERVICES_INFO" \
   --route "/api/automation=http://127.0.0.1:${AUTOMATION_PORT}" \
   --route "/api=http://127.0.0.1:${AGENT_SERVER_PORT}" \

@@ -27,15 +27,18 @@ function sessionKeyPolicyBlock(): string {
 }
 
 function resolveStaticServerArgs(allowLanSessionKey: string | undefined): {
-  args: string[];
+  authArgs: string[];
+  sessionArgs: string[];
   stderr: string;
 } {
   const script = [
     "set -uo pipefail",
     "PORT=8000",
+    "EFFECTIVE_SESSION_KEY=test-session-key",
     "log() { printf '%s\\n' \"$*\" >&2; }",
     sessionKeyPolicyBlock(),
-    "printf '%s\\n' \"${STATIC_SERVER_SESSION_KEY_ARGS[@]}\"",
+    "printf 'auth:%s\\n' \"${STATIC_SERVER_AUTH_ARGS[*]}\"",
+    "printf 'session:%s\\n' \"${STATIC_SERVER_SESSION_KEY_ARGS[*]}\"",
   ].join("\n");
   const env: Record<string, string> = { PATH: process.env.PATH ?? "" };
   if (allowLanSessionKey !== undefined) {
@@ -46,22 +49,37 @@ function resolveStaticServerArgs(allowLanSessionKey: string | undefined): {
     env,
   });
   expect(result.status).toBe(0);
+  const lines = result.stdout.trim().split("\n");
   return {
-    args: result.stdout.trim() ? result.stdout.trim().split("\n") : [],
+    authArgs: lines[0]?.startsWith("auth:")
+      ? lines[0].slice("auth:".length).split(" ").filter(Boolean)
+      : [],
+    sessionArgs: lines[1]?.startsWith("session:")
+      ? lines[1].slice("session:".length).split(" ").filter(Boolean)
+      : [],
     stderr: result.stderr,
   };
 }
 
 describe("Docker session-key injection policy", () => {
-  it("does not inject the key by default", () => {
-    expect(resolveStaticServerArgs(undefined).args).toEqual([]);
+  it("requires a session key without injecting it into public HTML by default", () => {
+    const policy = resolveStaticServerArgs(undefined);
+    expect(policy.authArgs).toEqual(["--auth-required"]);
+    expect(policy.sessionArgs).toEqual([]);
   });
 
-  it("requires an explicit true value and warns when enabled", () => {
-    expect(resolveStaticServerArgs("1").args).toEqual([]);
+  it("requires an explicit true value before allowing trusted LAN key injection", () => {
+    const disabled = resolveStaticServerArgs("1");
+    expect(disabled.authArgs).toEqual(["--auth-required"]);
+    expect(disabled.sessionArgs).toEqual([]);
 
     const enabled = resolveStaticServerArgs("true");
-    expect(enabled.args).toEqual(["--allow-lan-session-key"]);
+    expect(enabled.authArgs).toEqual([]);
+    expect(enabled.sessionArgs).toEqual([
+      "--allow-lan-session-key",
+      "--session-api-key",
+      "test-session-key",
+    ]);
     expect(enabled.stderr).toContain("WARNING");
     expect(enabled.stderr).toContain("host loopback only");
   });
