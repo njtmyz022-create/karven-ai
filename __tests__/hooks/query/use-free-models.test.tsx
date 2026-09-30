@@ -124,9 +124,13 @@ describe("useHydrateFreeModels", () => {
       wrapper,
     });
 
-    const modelFlagsQuery = result.current.queryClient
-      .getQueryCache()
-      .getAll()[0];
+    const modelQueryCache = result.current.queryClient.getQueryCache();
+    await waitFor(() => {
+      expect(modelQueryCache.getAll()).toHaveLength(1);
+      expect(modelQueryCache.getAll()[0].state.fetchStatus).toBe("idle");
+    });
+
+    const modelFlagsQuery = modelQueryCache.getAll()[0];
     expect(modelFlagsQuery?.state.status).toBe("pending");
     expect(result.current.defaultModelReady).toBe(false);
     expect(result.current.freeModels.size).toBe(0);
