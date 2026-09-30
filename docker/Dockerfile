@@ -195,4 +195,4 @@ USER root
 # Port 8000 is the unified entry point.
 EXPOSE 8000
 
-ENTRYPOINT ["tini", "--", "/opt/agent-canvas/entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "/bin/bash", "/opt/agent-canvas/entrypoint.sh"]
