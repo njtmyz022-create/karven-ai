@@ -635,6 +635,8 @@ export function BackendForm({
           name={`${testIdRoot}-api-key`}
           type="password"
           label={t(I18nKey.BACKEND$KEY_LABEL)}
+          showRequiredTag={needsApiKey}
+          required={needsApiKey}
           value={apiKey}
           onChange={(value) => {
             setApiKey(value);
@@ -923,6 +925,8 @@ function ManualConnectionColumn({
         name={`${testIdRoot}-api-key`}
         type="password"
         label={t(I18nKey.BACKEND$KEY_LABEL)}
+        showRequiredTag={requireApiKey || kind !== "local"}
+        required={requireApiKey || kind !== "local"}
         value={apiKey}
         onChange={(value) => {
           setApiKey(value);

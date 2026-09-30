@@ -16,7 +16,7 @@ describe("Karven backend connection options", () => {
   it("requires the Karven Agent API key and omits upstream Cloud login", () => {
     render(<BackendConnectionOptions onConnected={vi.fn()} />);
 
-    expect(screen.getByTestId("add-backend-api-key")).toBeInTheDocument();
+    expect(screen.getByTestId("add-backend-api-key")).toBeRequired();
     expect(screen.getByTestId("add-backend-submit")).toBeDisabled();
     expect(screen.queryByTestId("add-backend-kind")).not.toBeInTheDocument();
     expect(
