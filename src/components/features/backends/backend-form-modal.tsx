@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 13871)
-Total output lines: 1640
-
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -505,7 +502,640 @@ export function BackendForm({
   // rotating the API key on a cloud backend (e.g. an OHE/enterprise instance
   // on a custom domain) does not silently downgrade it to "local" and switch
   // the auth header from `Authorization: Bearer` to `X-Session-API-Key`.
-  // Only infer from the host whe…4871 tokens truncated…}-tab`;
+  // Only infer from the host when adding a new backend.
+  const fixedKind: BackendKind | null =
+    mode === "edit" && backend ? backend.kind : null;
+
+  const {
+    name,
+    setName,
+    host,
+    setHost,
+    apiKey,
+    setApiKey,
+    connectionError,
+    setConnectionError,
+    isSubmitting,
+    kind: inferredKind,
+    handleSubmit: runSubmit,
+  } = useBackendForm({
+    initialName: backend?.name ?? "",
+    initialHost: backend?.host ?? "",
+    initialApiKey: backend?.apiKey ?? "",
+    onTestConnection: testBackendConnection,
+    onSuccess: async () => {
+      const payload: BackendFormSubmitPayload = {
+        name: name.trim(),
+        host: normalizeHost(host),
+        apiKey: apiKey.trim(),
+        kind: fixedKind ?? inferredKind,
+      };
+      if (mode === "edit" && backend) {
+        updateBackend(backend.id, payload);
+      } else {
+        addBackend(payload);
+      }
+      onSubmitted();
+    },
+    requireApiKey,
+    onSubmitOverride,
+  });
+
+  // Inline validation: only show errors after the user has left a field.
+  const [nameTouched, setNameTouched] = React.useState(false);
+  const [hostTouched, setHostTouched] = React.useState(false);
+
+  const kind = fixedKind ?? inferredKind;
+  const testIdRoot =
+    explicitTestIdRoot ?? (mode === "edit" ? "edit-backend" : "add-backend");
+
+  const needsApiKey = requireApiKey || kind !== "local";
+  const canSubmit =
+    name.trim().length > 0 &&
+    isValidHostUrl(host) &&
+    (!needsApiKey || apiKey.trim().length > 0);
+
+  // Error messages — only surfaced after the user has blurred the field.
+  const nameError =
+    nameTouched && !name.trim() ? t(I18nKey.BACKEND$NAME_REQUIRED) : undefined;
+  const hostError = hostTouched
+    ? !host.trim()
+      ? t(I18nKey.BACKEND$HOST_REQUIRED)
+      : !isValidHostUrl(host)
+        ? t(I18nKey.BACKEND$HOST_INVALID)
+        : undefined
+    : undefined;
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (!canSubmit) {
+      // Mark all validated fields as touched so inline errors become visible
+      // (e.g. user pressed Enter before filling required fields).
+      setNameTouched(true);
+      setHostTouched(true);
+      return;
+    }
+    await runSubmit(event);
+  };
+
+  return (
+    <form
+      data-testid={`${testIdRoot}-form`}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4"
+    >
+      <div
+        data-testid={`${testIdRoot}-configuration-fields`}
+        className={cn(
+          "flex flex-col gap-4",
+          hideConfigurationFields && "hidden",
+        )}
+      >
+        <SettingsInput
+          testId={`${testIdRoot}-name`}
+          name={`${testIdRoot}-name`}
+          type="text"
+          label={t(I18nKey.BACKEND$NAME_LABEL)}
+          value={name}
+          onChange={(value) => {
+            setName(value);
+            setConnectionError(null);
+          }}
+          onBlur={() => setNameTouched(true)}
+          // eslint-disable-next-line i18next/no-literal-string -- example placeholder, not user-facing copy
+          placeholder="Production"
+          className="w-full"
+          showRequiredTag
+          error={nameError}
+        />
+
+        <SettingsInput
+          testId={`${testIdRoot}-host`}
+          name={`${testIdRoot}-host`}
+          type="text"
+          label={t(I18nKey.BACKEND$HOST_LABEL)}
+          value={host}
+          onChange={
+            hostReadOnly
+              ? undefined
+              : (value) => {
+                  setHost(value);
+                  setConnectionError(null);
+                }
+          }
+          onBlur={() => setHostTouched(true)}
+          placeholder={DEFAULT_OPENHANDS_CLOUD_HOST}
+          className="w-full"
+          showRequiredTag
+          error={hostError}
+          isDisabled={hostReadOnly}
+        />
+
+        <SettingsInput
+          testId={`${testIdRoot}-api-key`}
+          name={`${testIdRoot}-api-key`}
+          type="password"
+          label={t(I18nKey.BACKEND$KEY_LABEL)}
+          value={apiKey}
+          onChange={(value) => {
+            setApiKey(value);
+            setConnectionError(null);
+          }}
+          placeholder=""
+          className="w-full"
+        />
+
+        {connectionError ? (
+          <div
+            role="alert"
+            data-testid={`${testIdRoot}-error`}
+            className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 whitespace-pre-wrap break-words"
+          >
+            {connectionError}
+          </div>
+        ) : null}
+
+        {mode === "edit" && backend && (
+          <BackendStatusBadge backend={backend} testIdRoot={testIdRoot} />
+        )}
+      </div>
+
+      {renderActions ? (
+        renderActions({
+          canSubmit: canSubmit && !isSubmitting,
+          isSubmitting,
+          testIdRoot,
+        })
+      ) : (
+        <div className="flex justify-end gap-2 mt-2 w-full">
+          <BrandButton
+            type="button"
+            variant="secondary"
+            onClick={onSubmitted}
+            testId={`${testIdRoot}-cancel`}
+          >
+            {t(I18nKey.BUTTON$CANCEL)}
+          </BrandButton>
+          <BrandButton
+            type="submit"
+            variant="primary"
+            isDisabled={!canSubmit || isSubmitting}
+            testId={`${testIdRoot}-submit`}
+          >
+            {t(I18nKey.BACKEND$SAVE)}
+          </BrandButton>
+        </div>
+      )}
+    </form>
+  );
+}
+
+// ── Add-mode two-column layout ──────────────────────────────────────
+
+/**
+ * @spec BM-002 — Adding a backend auto-switches the active selection to it
+ * (BM-001), so a backend-scoped detail page the user is viewing now belongs
+ * to the previous backend. Redirect to that section's list so they never see
+ * stale data, mirroring the switch-backend redirect in BackendSelector.
+ */
+function useRedirectAfterAddBackend() {
+  const { currentPath, navigate } = useNavigation();
+  return React.useCallback(() => {
+    if (/^\/automations\/[^/]+/.test(currentPath)) navigate("/automations");
+    else if (/^\/conversations\/[^/]+/.test(currentPath))
+      navigate("/conversations");
+  }, [currentPath, navigate]);
+}
+
+interface BackendConnectionOptionsProps {
+  onConnected: (
+    payload: BackendFormSubmitPayload,
+    connectionMethod: BackendConnectionMethod,
+    metadata?: BackendConnectionTestMetadata,
+  ) => void;
+  testIdRoot?: string;
+  initialManualBackend?: Partial<
+    Pick<BackendFormSubmitPayload, "name" | "host" | "apiKey">
+  >;
+  requireManualApiKey?: boolean;
+  manualSubmitLabel?: React.ReactNode;
+  manualSubmittingLabel?: React.ReactNode;
+  manualSubmitTestId?: string;
+  analyticsSource?: CloudConnectionSource;
+}
+
+/**
+ * Manual agent-server connection plus OpenHands Cloud OAuth login.
+ * Used by both the Add Backend modal and the onboarding backend step so
+ * supported backend choices stay consistent across first-run and settings UI.
+ */
+export function BackendConnectionOptions({
+  onConnected,
+  testIdRoot = "add-backend",
+  initialManualBackend,
+  requireManualApiKey = false,
+  manualSubmitLabel,
+  manualSubmittingLabel,
+  manualSubmitTestId,
+  analyticsSource,
+}: BackendConnectionOptionsProps) {
+  const { t } = useTranslation("openhands");
+  const lockedCloudHost = IS_KARVEN_PRODUCT_BUILD ? null : getLockedCloudHost();
+
+  if (lockedCloudHost) {
+    return (
+      <div
+        data-testid={`${testIdRoot}-connection-options`}
+        className="flex justify-center"
+      >
+        <div className="w-full">
+          <CloudLoginColumn
+            onConnected={onConnected}
+            testIdRoot={testIdRoot}
+            lockedHost={lockedCloudHost}
+            analyticsSource={analyticsSource}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid={`${testIdRoot}-connection-options`}
+      className="flex flex-col gap-6 md:flex-row"
+    >
+      <div className="flex-1 min-w-0">
+        <ManualConnectionColumn
+          onConnected={onConnected}
+          testIdRoot={testIdRoot}
+          initialBackend={initialManualBackend}
+          requireApiKey={requireManualApiKey || IS_KARVEN_PRODUCT_BUILD}
+          submitLabel={manualSubmitLabel ?? t(I18nKey.BACKEND$CONNECT)}
+          submittingLabel={
+            manualSubmittingLabel ??
+            t(I18nKey.ONBOARDING$BACKEND_STATUS_CHECKING)
+          }
+          submitTestId={manualSubmitTestId}
+          fixedKind={IS_KARVEN_PRODUCT_BUILD ? "local" : undefined}
+          showKindSelector={!IS_KARVEN_PRODUCT_BUILD}
+        />
+      </div>
+
+      {!IS_KARVEN_PRODUCT_BUILD && (
+        <div className="flex-1 min-w-0">
+          <CloudLoginColumn
+            onConnected={onConnected}
+            testIdRoot={testIdRoot}
+            analyticsSource={analyticsSource}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ManualConnectionColumnProps {
+  onConnected: (
+    payload: BackendFormSubmitPayload,
+    connectionMethod: BackendConnectionMethod,
+    metadata?: BackendConnectionTestMetadata,
+  ) => void;
+  testIdRoot: string;
+  initialBackend?: Partial<
+    Pick<BackendFormSubmitPayload, "name" | "host" | "apiKey">
+  >;
+  requireApiKey: boolean;
+  submitLabel: React.ReactNode;
+  submittingLabel: React.ReactNode;
+  submitTestId?: string;
+  fixedKind?: BackendKind;
+  showKindSelector?: boolean;
+}
+
+/**
+ * Manual connection via Host + API Key. Designed for self-hosted agent servers
+ * and self-hosted OpenHands Cloud with API key auth.
+ */
+function ManualConnectionColumn({
+  onConnected,
+  testIdRoot,
+  initialBackend,
+  requireApiKey,
+  submitLabel,
+  submittingLabel,
+  submitTestId,
+  fixedKind,
+  showKindSelector = true,
+}: ManualConnectionColumnProps) {
+  const { t } = useTranslation("openhands");
+
+  const {
+    name,
+    setName,
+    host,
+    setHost,
+    apiKey,
+    setApiKey,
+    connectionError,
+    setConnectionError,
+    isSubmitting,
+    kind,
+    setKind,
+    canSubmit,
+    handleSubmit,
+  } = useBackendForm({
+    initialName: initialBackend?.name ?? "",
+    initialHost: initialBackend?.host ?? "",
+    initialApiKey: initialBackend?.apiKey ?? "",
+    onTestConnection: testBackendConnection,
+    onSuccess: (metadata) => {
+      onConnected(
+        {
+          name: name.trim(),
+          host: normalizeHost(host),
+          apiKey: apiKey.trim(),
+          kind,
+        },
+        "manual",
+        metadata,
+      );
+    },
+    requireApiKey,
+    fixedKind,
+  });
+
+  return (
+    <form
+      data-testid={`${testIdRoot}-form`}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4 flex-1 min-w-0"
+    >
+      <SettingsInput
+        testId={`${testIdRoot}-name`}
+        name={`${testIdRoot}-name`}
+        type="text"
+        label={t(I18nKey.BACKEND$NAME_LABEL)}
+        hint={t(I18nKey.BACKEND$NAME_HELPER)}
+        value={name}
+        onChange={(value) => {
+          setName(value);
+          setConnectionError(null);
+        }}
+        // eslint-disable-next-line i18next/no-literal-string -- example placeholder, not user-facing copy
+        placeholder="e.g. My Server"
+        className="w-full"
+      />
+
+      <SettingsInput
+        testId={`${testIdRoot}-host`}
+        name={`${testIdRoot}-host`}
+        type="text"
+        label={t(I18nKey.BACKEND$HOST_LABEL)}
+        hint={t(I18nKey.BACKEND$HOST_HELPER)}
+        value={host}
+        onChange={(value) => {
+          setHost(value);
+          setConnectionError(null);
+        }}
+        // eslint-disable-next-line i18next/no-literal-string -- example value, not translatable
+        placeholder="http://localhost:8000"
+        className="w-full"
+      />
+
+      {showKindSelector ? (
+        <div className="flex flex-col items-start gap-2.5">
+          <span className="text-sm">{t(I18nKey.BACKEND$KIND_LABEL)}</span>
+          <SegmentedToggle<BackendKind>
+            value={kind}
+            options={[
+              { value: "local", label: t(I18nKey.BACKEND$KIND_LOCAL) },
+              { value: "cloud", label: t(I18nKey.BACKEND$KIND_CLOUD) },
+            ]}
+            onChange={(value) => setKind(value)}
+            ariaLabel={t(I18nKey.BACKEND$KIND_LABEL)}
+            testId={`${testIdRoot}-kind`}
+          />
+        </div>
+      ) : null}
+
+      <SettingsInput
+        testId={`${testIdRoot}-api-key`}
+        name={`${testIdRoot}-api-key`}
+        type="password"
+        label={t(I18nKey.BACKEND$KEY_LABEL)}
+        value={apiKey}
+        onChange={(value) => {
+          setApiKey(value);
+          setConnectionError(null);
+        }}
+        // eslint-disable-next-line i18next/no-literal-string -- example value, not translatable
+        placeholder="sk-••••••••••"
+        className="w-full"
+      />
+
+      {connectionError ? (
+        <div
+          role="alert"
+          data-testid={`${testIdRoot}-error`}
+          className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300 whitespace-pre-wrap break-words"
+        >
+          {connectionError}
+        </div>
+      ) : null}
+
+      <BrandButton
+        type="submit"
+        variant="secondary"
+        isDisabled={!canSubmit || isSubmitting}
+        testId={submitTestId ?? `${testIdRoot}-submit`}
+        className="w-full text-center"
+      >
+        {isSubmitting ? submittingLabel : submitLabel}
+      </BrandButton>
+    </form>
+  );
+}
+
+interface CloudLoginColumnProps {
+  onConnected: (
+    payload: BackendFormSubmitPayload,
+    connectionMethod: BackendConnectionMethod,
+    metadata?: BackendConnectionTestMetadata,
+  ) => void;
+  testIdRoot: string;
+  lockedHost?: string;
+  analyticsSource?: CloudConnectionSource;
+  /** Omit repeated branding when a surrounding chooser already names Cloud. */
+  showBranding?: boolean;
+}
+
+/**
+ * One-click OAuth login with OpenHands Cloud. Includes an "Advanced"
+ * disclosure for users who self-host OpenHands Cloud and need to override the
+ * host.
+ */
+function CloudLoginColumn({
+  onConnected,
+  testIdRoot,
+  lockedHost,
+  analyticsSource,
+  showBranding = true,
+}: CloudLoginColumnProps) {
+  const { t } = useTranslation("openhands");
+
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  const [customHost, setCustomHost] = React.useState("");
+  const advancedPanelId = `${testIdRoot}-advanced-panel`;
+
+  const effectiveHost =
+    lockedHost ?? (customHost.trim() || DEFAULT_OPENHANDS_CLOUD_HOST);
+
+  const handleLoginSuccess = (apiKey: string) => {
+    onConnected(
+      {
+        name: "OpenHands Cloud",
+        host: normalizeHost(effectiveHost),
+        apiKey,
+        kind: "cloud",
+      },
+      "cloud_login",
+    );
+  };
+
+  return (
+    <div className="flex w-full min-w-0 flex-col items-center gap-3">
+      {showBranding ? (
+        <div className="flex flex-col items-center gap-1">
+          <OpenHandsLogoWhite
+            width={56}
+            height={56}
+            className="text-contrast [&_path:not([fill=transparent])]:fill-current"
+            aria-hidden
+          />
+
+          <h4
+            className={modalTitleLgMediumClassName}
+            data-testid={`${testIdRoot}-cloud-title`}
+          >
+            {t(I18nKey.BACKEND$CLOUD_TITLE)}
+          </h4>
+        </div>
+      ) : null}
+
+      <DeviceFlowAuth
+        host={effectiveHost}
+        onSuccess={handleLoginSuccess}
+        testIdRoot={testIdRoot}
+        analyticsSource={analyticsSource}
+        className="w-full items-center"
+        idleDescription={
+          <p
+            className="text-center text-sm leading-relaxed text-muted"
+            data-testid={`${testIdRoot}-cloud-description`}
+          >
+            {t(I18nKey.BACKEND$CLOUD_DESCRIPTION)}
+          </p>
+        }
+        // Host overriding only matters before the flow starts, so it rides the
+        // same idle-only slot as the description instead of sitting under the
+        // authorization status.
+        idleFooter={
+          lockedHost ? null : (
+            // Keep the Advanced disclosure at the original compact width even
+            // though the surrounding cloud panel spans the full chooser.
+            <div className="mx-auto w-full max-w-md">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((open) => !open)}
+                aria-expanded={advancedOpen}
+                aria-controls={advancedPanelId}
+                data-testid={`${testIdRoot}-advanced-toggle`}
+                className="flex w-full cursor-pointer items-center justify-center gap-1 text-center text-xs text-muted transition-colors hover:text-content-2"
+              >
+                <span>{t(I18nKey.BACKEND$ADVANCED)}</span>
+                <ChevronDownSmallIcon
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted transition-transform duration-200 ease-out",
+                    advancedOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </button>
+              {/* Height animates through `grid-template-rows` (0fr ↔ 1fr) so no
+                  max-height guess is needed; the inner clip is what makes `0fr`
+                  collapse. Content stays mounted so a typed host survives, and
+                  `inert` keeps the collapsed field out of the tab order. */}
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none",
+                  advancedOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                )}
+              >
+                <div className="overflow-hidden">
+                  <div
+                    id={advancedPanelId}
+                    data-testid={`${testIdRoot}-advanced-panel`}
+                    aria-hidden={!advancedOpen}
+                    inert={!advancedOpen ? true : undefined}
+                    className={cn(
+                      "pt-3 transition-opacity duration-200 ease-out motion-reduce:transition-none",
+                      advancedOpen ? "opacity-100" : "opacity-0",
+                    )}
+                  >
+                    <SettingsInput
+                      testId={`${testIdRoot}-cloud-host`}
+                      name={`${testIdRoot}-cloud-host`}
+                      type="text"
+                      label={t(I18nKey.BACKEND$HOST_LABEL)}
+                      value={customHost}
+                      onChange={setCustomHost}
+                      placeholder={DEFAULT_OPENHANDS_CLOUD_HOST}
+                      className="w-full"
+                    />
+                    <p className="mt-1 text-xs text-muted">
+                      {t(I18nKey.BACKEND$LOGIN_CLOUD_HINT)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        }
+      />
+    </div>
+  );
+}
+
+interface BackendOptionTabProps {
+  value: AddBackendOption;
+  selectedValue: AddBackendOption;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  onSelect: (value: AddBackendOption) => void;
+  panelId: string;
+  testId: string;
+}
+
+/**
+ * Presents a connection-method tab: icon, title, and a one-line subtitle.
+ *
+ * The shared tablist owns the outer border, so these buttons meet cleanly at
+ * the center. Selection uses a bottom bar instead of recoloring the full
+ * outline, preserving the group as one visual control.
+ */
+function BackendOptionTab({
+  value,
+  selectedValue,
+  title,
+  description,
+  icon,
+  onSelect,
+  panelId,
+  testId,
+}: BackendOptionTabProps) {
+  const isSelected = value === selectedValue;
+  const tabId = `${testId}-tab`;
 
   return (
     <button
