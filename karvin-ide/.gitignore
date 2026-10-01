@@ -1,6 +1,6 @@
-node_modules/
+node_modules
 data/
 .env
 !.env.example
 test/*-data-*/
-.runtime/
+.runtime
