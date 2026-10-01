@@ -1,0 +1,26 @@
+{
+  "name": "KARVIN IDE",
+  "build": {
+    "dockerfile": "../karvin-ide/Dockerfile.ide",
+    "context": ".."
+  },
+  "overrideCommand": true,
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}/karvin-ide",
+  "forwardPorts": [
+    3000
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "KARVIN IDE",
+      "onAutoForward": "openBrowser",
+      "visibility": "private"
+    }
+  },
+  "postCreateCommand": "ln -sfn /app/node_modules node_modules && ln -sfn /app/.runtime .runtime",
+  "postStartCommand": "node ../.devcontainer/start-karvin.mjs",
+  "shutdownAction": "stopContainer",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb"
+  }
+}
