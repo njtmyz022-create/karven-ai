@@ -22,5 +22,8 @@
   "hostRequirements": {
     "cpus": 2,
     "memory": "4gb"
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
   }
 }

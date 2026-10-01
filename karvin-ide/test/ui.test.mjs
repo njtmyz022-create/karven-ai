@@ -31,3 +31,10 @@ test('dashboard interaction: create project, Cline approval, results, source, fo
   assert.deepEqual(runtimeErrors,[]);
  }catch(error){console.error('UI verification failed:',error.message);throw error;}finally{for(const connection of connections)connection.close();await pause();await pause();dom.window.close();await app.close();await rm(dir,{recursive:true,force:true});}
 });
+
+
+test('landing tabs change destination and preview, with keyboard navigation',async()=>{
+ const html=await readFile(new URL('../public/landing.html',import.meta.url),'utf8'),script=await readFile(new URL('../public/landing.js',import.meta.url),'utf8');
+ const dom=new JSDOM(html,{url:'https://workspace.example',runScripts:'outside-only'}),document=dom.window.document;
+ try{dom.window.eval(script);document.querySelector('[data-launch=missions]').click();assert.equal(document.getElementById('launch-action').getAttribute('href'),'/workspace');assert.equal(document.getElementById('tab-missions').getAttribute('aria-selected'),'true');document.getElementById('tab-missions').focus();document.getElementById('tab-missions').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));assert.equal(document.getElementById('tab-terminal').getAttribute('aria-selected'),'true');document.getElementById('demo-refactor').click();assert.match(document.getElementById('demo-title').textContent,/change with context/);document.getElementById('demo-automate').click();assert.match(document.getElementById('demo-terminal').textContent,/npm test/);assert.equal(document.querySelectorAll('.feature-grid article').length,8);assert.equal(document.querySelectorAll('.provider-grid>span').length,12);assert.ok(document.querySelector('footer'));}finally{dom.window.close();}
+});

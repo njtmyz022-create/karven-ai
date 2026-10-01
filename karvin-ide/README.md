@@ -1,8 +1,12 @@
+# GitHub workspace access
+
+The Codespaces launcher uses private GitHub account access without a second token/password prompt. See [CODESPACES.md](CODESPACES.md). Other hosts retain the password and token described below.
+
 # KARVIN IDE deployment
 
 On Linux amd64 run `bash scripts/build-ide.sh`, set `WEB_AGENT_TOKEN` to a random password of at least 24 characters, then run `npm run start:ide`.
 
-Mission Control is at `/`, code-server at `/ide/`, health at `/healthz`. IDE password and dashboard token match. code-server authenticates HTTP and WebSocket access. Editor, explorer, terminal, Git, extensions, Cline and app previews are included. Preview apps using `/ide/proxy/PORT/`. Mission Control projects share the IDE project root.
+The landing page is at `/`, Mission Control at `/workspace`, code-server at `/ide/`, health at `/healthz`. IDE password and dashboard token match. code-server authenticates HTTP and WebSocket access. Editor, explorer, terminal, Git, extensions, Cline and app previews are included. Preview apps using `/ide/proxy/PORT/`. Mission Control projects share the IDE project root.
 
 Connect your model in dashboard Connections or the Cline extension settings. Keys never return through the API. This is one trusted owner's workspace, not a multi-tenant SaaS.
 
@@ -127,3 +131,4 @@ Native browser execution is blocked in this workspace: Chromium download endpoin
 Browser automation is adapted from [shhivv/third-hand](https://github.com/shhivv/third-hand), revision `430394b35dbb44ff8b303bf19da29b0828d92bd2`; its MIT license is retained at the repository root. The macOS source remains in `Sources/ThirdHand` with its original signing and build process.
 
 Coding uses [Cline](https://github.com/cline/cline) through the published `@cline/sdk` package version 0.0.89. Cline is Apache-2.0, copyright Cline Bot Inc.; the license is retained in `CLINE-LICENSE`. Karvin is an independent application and is not endorsed by either upstream project.
+

@@ -63,7 +63,7 @@ export function createKarvinServer(config={}){
      writeFileSync(settingsPath,JSON.stringify(saved),{mode:0o600});for(const key of settingKeys)if(saved[key])process.env[key]=saved[key];
      return json(res,200,{saved:true});
     }
-    if(u.pathname==='/api/health'&&req.method==='GET')return json(res,200,{name:'Karvin',ready:browserReady(),browserReady:browserReady(),codingReady:codingReady(),codingEngine:'@cline/sdk',codingModel:process.env.CODE_MODEL||process.env.LLM_MODEL||null,model:process.env.LLM_MODEL||null,commandsEnabled:allowCommands,concurrency:limit,active});
+    if(u.pathname==='/api/health'&&req.method==='GET')return json(res,200,{name:'Karvin',accessMode:config.accessMode||'token',ready:browserReady(),browserReady:browserReady(),codingReady:codingReady(),codingEngine:'@cline/sdk',codingModel:process.env.CODE_MODEL||process.env.LLM_MODEL||null,model:process.env.LLM_MODEL||null,commandsEnabled:allowCommands,concurrency:limit,active});
     if(u.pathname==='/api/projects'&&req.method==='GET')return json(res,200,[...projects.values()]);
     if(u.pathname==='/api/projects'&&req.method==='POST'){
      const input=await body(req);if(typeof input.name!=='string'||!input.name.trim()||input.name.length>80)throw new Error('Project name must be 1–80 characters');
@@ -110,7 +110,7 @@ export function createKarvinServer(config={}){
     if(match[2]==='export')res.setHeader('Content-Disposition',`attachment; filename="karvin-${task.id}.json"`);
     return json(res,200,task);
    }
-   const files={'/':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css']};const file=files[u.pathname];if(!file)return json(res,404,{error:'Not found'});
+   const files={'/':['landing.html','text/html'],'/workspace':['index.html','text/html'],'/landing.css':['landing.css','text/css'],'/landing.js':['landing.js','text/javascript'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css']};const file=files[u.pathname];if(!file)return json(res,404,{error:'Not found'});
    res.writeHead(200,{'Content-Type':file[1],'X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'"});res.end(readFileSync(new URL(`./public/${file[0]}`,import.meta.url)));
   }catch(error){if(!res.headersSent)json(res,error.code==='ENOENT'?404:400,{error:error.message});else res.end();}
  });
@@ -121,3 +121,4 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
  const app=createKarvinServer();app.server.listen(app.port,app.host,()=>console.log(`Karvin: http://${app.host}:${app.server.address().port}`));
  const shutdown=()=>{void app.close().then(()=>process.exit(0));setTimeout(()=>process.exit(0),5000).unref();};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
 }
+

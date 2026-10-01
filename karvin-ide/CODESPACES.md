@@ -1,9 +1,11 @@
-# Run KARVIN IDE in GitHub Codespaces
+# KARVIN IDE on GitHub Codespaces
 
-Create a Codespace from the karvin-ide-live branch of njtmyz022-create/karven-ai. The dev container builds the existing IDE image, runs its tests, installs code-server and Cline, and starts Karvin automatically. Open forwarded port 3000 for Mission Control; /ide/ opens the editor. The port defaults to private. Use WEB_AGENT_TOKEN from the workspace .env for both dashboard access and the IDE password. Configure your model through Connections or Cline settings.
+Open the `karvin-ide-live` branch in GitHub Codespaces. The devcontainer installs the editor, Cline extension, Chromium, dependencies, and GitHub CLI. Port 3000 opens the full Karvin landing page. `/ide/` opens the editor and `/workspace` opens Mission Control.
 
-Projects, settings and task history are stored in karvin-ide/data on the Codespace workspace volume. Commit project code or export ZIPs before deleting the Codespace. A Codespace is a development environment: stopping it stops the application. Existing GitHub Codespaces quotas and charges apply; no paid upgrade is configured by this setup.
+The Codespaces launcher uses your existing private GitHub gateway instead of asking for a second workspace password. The application verifies port 3000 is private with the GitHub CLI before allowing each request; a failed verification refuses access. Any forwarded editor port must also remain private. Non-Codespaces deployments retain token and code-server password authentication. Do not publish the editor port.
 
-After restarting the Codespace, the post-start command starts the server again. Troubleshoot with data/ide.log. To restart manually, stop the existing launcher process and run node ../.devcontainer/start-karvin.mjs from karvin-ide.
+Model access is separate: connect your preferred provider in Cline or Mission Control. No model is configured by default.
 
-Status: configuration prepared; live Codespace creation and browser/editor verification must be checked separately. Model credentials are not included.
+To restart after a source update, stop the process referenced by `data/ide-launcher.pid`, then run `node ../.devcontainer/start-karvin.mjs`. Never display `.env` or share its values.
+
+Codespaces stops after inactivity and is subject to your account quota. Open the Codespace again to resume the app. Commit or export work you want to keep.

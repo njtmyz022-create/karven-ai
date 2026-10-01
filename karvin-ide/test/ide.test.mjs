@@ -32,3 +32,29 @@ test('IDE proxy preserves login redirects, cookies and WebSocket authentication 
   const response=await new Promise((resolve,reject)=>{const s=net.connect(port,'127.0.0.1',()=>s.write('GET /ide/ HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n'));let data='';s.on('data',b=>data+=b);s.on('end',()=>resolve(data));s.on('error',reject);});assert.match(response,/401 Unauthorized/);
  }finally{await close(proxy);await close(agent);await close(ide);}
 });
+
+test('GitHub gateway fails closed outside private Codespaces ports',async()=>{
+ const {createCodespacesGate}=await import('../codespaces-gateway.mjs');
+ assert.throws(()=>createCodespacesGate({}),/requires a Codespace/);
+ let visibility='private';
+ const gate=createCodespacesGate({CODESPACES:'true',CODESPACE_NAME:'example',PORT:'3000'},async()=>[{sourcePort:3000,visibility}]);
+ assert.equal(await gate.allow({headers:{host:'example-3000.app.github.dev'}}),true);
+ assert.equal(await gate.allow({headers:{host:'attacker.example'}}),false);
+ visibility='public';assert.equal(await gate.verify(),false);
+ const broken=createCodespacesGate({CODESPACES:'true',CODESPACE_NAME:'example'},async()=>{throw new Error('offline');});assert.equal(await broken.verify(),false);
+});
+test('private gateway injects internal API auth and denies unverified HTTP and WebSockets',async()=>{
+ let allowed=true;
+ const ide=http.createServer((req,res)=>res.end('editor'));
+ const agent=http.createServer((req,res)=>{res.end(req.headers.authorization||'missing');});
+ const gate={allow:async()=>allowed,verify:async()=>allowed};
+ const proxy=createIDEProxy({idePort:await listen(ide),agentPort:await listen(agent),gate,agentToken:'internal-only'}),port=await listen(proxy),base=`http://127.0.0.1:${port}`;
+ try{assert.equal(await (await fetch(base+'/api/health')).text(),'Bearer internal-only');allowed=false;assert.equal((await fetch(base+'/api/health')).status,403);assert.equal((await fetch(base+'/ide/')).status,403);}finally{await close(proxy);await close(agent);await close(ide);}
+});
+test('private gateway opens password-protected editor with an internal session',async()=>{
+ let logins=0;
+ const ide=http.createServer(async(req,res)=>{if(req.url==='/login'){let body='';for await(const chunk of req)body+=chunk;assert.equal(new URLSearchParams(body).get('password'),'internal-secret');logins++;res.writeHead(302,{'set-cookie':'code-server-session=internal; HttpOnly; Path=/','location':'/'});res.end();}else{res.writeHead(req.headers.cookie==='code-server-session=internal'?200:401);res.end('editor');}});
+ const agent=http.createServer((req,res)=>res.end('missions'));
+ const proxy=createIDEProxy({idePort:await listen(ide),agentPort:await listen(agent),gate:{allow:async()=>true,verify:async()=>true},editorToken:'internal-secret'}),base=`http://127.0.0.1:${await listen(proxy)}`;
+ try{assert.equal((await fetch(base+'/ide/')).status,200);assert.equal((await fetch(base+'/ide/')).status,200);assert.equal(logins,1);}finally{await close(proxy);await close(agent);await close(ide);}
+});
