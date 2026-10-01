@@ -1,0 +1,23 @@
+{
+  "name": "karvin",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start:ide": "node --env-file-if-exists=.env ide.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test test/agent.test.mjs test/server.test.mjs test/coding.test.mjs test/ui.test.mjs test/ide.test.mjs",
+    "test:browser": "node --test test/browser.test.mjs"
+  },
+  "dependencies": {
+    "@cline/sdk": "0.0.89",
+    "fflate": "^0.8.2",
+    "playwright": "1.58.2"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
