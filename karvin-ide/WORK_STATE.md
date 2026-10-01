@@ -1,21 +1,15 @@
-# KARVIN IDE — current execution state, 2026-10-01
+# KARVIN IDE current state
 
-## Running GitHub Codespace
-- Name: miniature-winner-r4vw67p6jqqjh5995.
-- Workspace: https://miniature-winner-r4vw67p6jqqjh5995.github.dev/
-- App: https://miniature-winner-r4vw67p6jqqjh5995-3000.app.github.dev/
-- Repository: njtmyz022-create/karven-ai; branch karvin-ide-live; app directory karvin-ide.
-- Container creation and post-start completed successfully. Port 3000 is private and the application is running.
-- /healthz confirmed {editor:true,missions:true} and HTTP 200.
-- Docker build passed all 17 core tests and installed code-server 4.139.1 (checksum verified) and Cline 4.1.22.
-- npm run test:browser on the actual Codespace passed all 3 real Chromium tests: fill/click/evidence; repeated-action loop prevention; cancellation. These browser tests use deterministic model fixtures.
-- Public browser navigation reached KARVIN IDE Mission Control's access-token screen. Authenticated editor UI and live model execution are not claimed as verified.
-- Workspace access token and editor password are WEB_AGENT_TOKEN in karvin-ide/.env. Never commit or print the token. User can retrieve it in their private Codespace.
-- Model credentials have not been configured. Existing model connection UI and Cline settings are available after owner login.
-- Codespaces is a development runtime: stopping/suspending it stops the application. Workspace files persist until deletion; it is not permanent hosting.
+Repository: njtmyz022-create/karven-ai, branch karvin-ide-live. Existing Codespace: miniature-winner-r4vw67p6jqqjh5995. App port 3000 must remain private.
 
-## Resume
-Use this existing Codespace rather than creating another one. The post-start launcher in .devcontainer/start-karvin.mjs restarts Karvin after a Codespace restart. See karvin-ide/data/ide.log for startup diagnostics. Complete owner login and actual model verification securely before claiming full AI functionality.
+Full Karvin-branded Cline-style landing page (navigation, hero, interactive workspace tabs, workflow demo, eight features, models, CTA, footer) committed. Landing at /, missions at /workspace, editor at /ide/.
 
-## Previous Railway blocker
-Railway provisioning remains blocked by free-plan resource limits. Authorized cleanup failed because Railway Agent usage limit was reached. No old Railway services or volumes were deleted. The earlier browser-fallback approval request was superseded by the user's instruction to run this in GitHub Codespaces; do not resume deletion as part of the GitHub task.
+Private GitHub gateway verifies port privacy with gh before each HTTP/WebSocket request. Server retains API token and code-server password internally; proxy opens editor session automatically after gateway verification. Normal hosts retain manual token/password auth. Never print .env or credentials. No model connection supplied.
+
+21 local core/UI/auth checks passed. Earlier actual Codespace Chromium suite passed 3 fixture-model tests. New live browser verification is pending.
+
+Codespace pulled e7838c8bd3d7136ea1f4423df9457c40a3f92bff and old launcher stopped. gh installed via apt and private ports verified. Landing HTML/CSS were published next in b7854b6e3998586819a2780e6d1a08526ef07355; Codespace still needs git pull --ff-only and launcher start. Current fresh browser tab displays VS Code Trust folder and continue prompt; requires user confirmation to enable terminal execution. Do not claim deployed or verified yet. User requested no extra token/password dialog.
+
+After confirmation: trust this repository folder only, terminal git pull --ff-only, node ../.devcontainer/start-karvin.mjs. Verify health, landing interaction/layout, /workspace no token prompt, /ide/ no password prompt, terminal/Cline visibility. Update this state and provide working URL.
+
+Codespaces suspends after inactivity. Prior Railway resource-limit blocker remains; no previous Railway services deleted. Do not resume Railway deletion for this task.
