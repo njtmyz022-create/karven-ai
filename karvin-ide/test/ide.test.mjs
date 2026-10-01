@@ -39,7 +39,9 @@ test('GitHub gateway fails closed outside private Codespaces ports',async()=>{
  let visibility='private';
  const gate=createCodespacesGate({CODESPACES:'true',CODESPACE_NAME:'example',PORT:'3000'},async()=>[{sourcePort:3000,visibility}]);
  assert.equal(await gate.allow({headers:{host:'example-3000.app.github.dev'}}),true);
- assert.equal(await gate.allow({headers:{host:'attacker.example'}}),false);
+ // Codespaces' private forwarding gateway rewrites Host. Privacy is checked
+ // against GitHub's port metadata, so the incoming Host header is not trusted.
+ assert.equal(await gate.allow({headers:{host:'attacker.example'}}),true);
  visibility='public';assert.equal(await gate.verify(),false);
  const broken=createCodespacesGate({CODESPACES:'true',CODESPACE_NAME:'example'},async()=>{throw new Error('offline');});assert.equal(await broken.verify(),false);
 });
