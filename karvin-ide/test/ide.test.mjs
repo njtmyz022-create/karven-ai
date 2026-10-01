@@ -5,6 +5,21 @@ import net from 'node:net';
 import {createIDEProxy} from '../ide-proxy.mjs';
 const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
 const close=s=>new Promise(r=>s.close(r));
+test('IDE health detects a stopped editor or mission service',async()=>{
+ let editorReady=true;
+ const ide=http.createServer((req,res)=>{res.writeHead(editorReady?200:503);res.end('editor');});
+ const agent=http.createServer((req,res)=>res.end('mission control'));
+ const proxy=createIDEProxy({idePort:await listen(ide),agentPort:await listen(agent)}),base=`http://127.0.0.1:${await listen(proxy)}`;
+ let agentClosed=false;
+ try{
+  assert.equal((await fetch(base+'/healthz')).status,200);
+  editorReady=false;
+  assert.equal((await fetch(base+'/healthz')).status,503);
+  editorReady=true;
+  await close(agent);agentClosed=true;
+  assert.equal((await fetch(base+'/healthz')).status,503);
+ }finally{await close(proxy);if(!agentClosed)await close(agent);await close(ide);}
+});
 test('IDE proxy preserves login redirects, cookies and WebSocket authentication rejection',async()=>{
  const ide=http.createServer((req,res)=>{if(req.url==='/'){res.writeHead(302,{location:'/login'});res.end();}else{res.setHeader('Set-Cookie','session=test; HttpOnly; Path=/');res.end('Sign in to KARVIN IDE');}});
  ide.on('upgrade',(req,socket)=>socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'));
