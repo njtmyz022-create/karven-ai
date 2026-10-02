@@ -5,11 +5,12 @@ COPY scripts ./scripts
 RUN bash scripts/build-cline-hub.sh && rm -rf .runtime/cline-source/.git && if [ "$(command -v bun)" != "/usr/local/bin/bun" ]; then cp "$(command -v bun)" /usr/local/bin/bun; fi
 
 
-FROM mcr.microsoft.com/playwright:v1.58.2-noble-amd64
+FROM node:22-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends gh git && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.runtime/browsers
+RUN npm ci && npx playwright install --with-deps chromium
 COPY *.mjs ./
 COPY public ./public
 COPY test ./test

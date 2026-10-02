@@ -5,7 +5,6 @@
     "context": ".."
   },
   "overrideCommand": true,
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}/karvin-ide",
   "forwardPorts": [
     3000
   ],
@@ -16,8 +15,8 @@
       "visibility": "private"
     }
   },
-  "postCreateCommand": "npm ci && ln -sfn /app/.runtime .runtime",
-  "postStartCommand": "node ../.devcontainer/start-karvin.mjs",
+  "postCreateCommand": "cd karvin-ide && ln -sfn /app/node_modules node_modules && ln -sfn /app/.runtime .runtime",
+  "postStartCommand": "cd karvin-ide && ln -sfn /app/node_modules node_modules && ln -sfn /app/.runtime .runtime && node ../.devcontainer/start-karvin.mjs",
   "shutdownAction": "stopContainer",
   "hostRequirements": {
     "cpus": 2,
