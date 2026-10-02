@@ -55,6 +55,7 @@ fi
 
 cd "$CLINE_DIR"
 "$BUN_BIN" install --frozen-lockfile
+"$BUN_BIN" run build:sdk
 "$BUN_BIN" -F @cline/cline-hub build:webview
 rm -rf node_modules
 "$BUN_BIN" install --filter @cline/cline-hub --production --frozen-lockfile
