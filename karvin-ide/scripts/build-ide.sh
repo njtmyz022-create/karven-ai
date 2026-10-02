@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-npm ci
+npm ci --include=dev --no-audit --no-fund
 npm test
 mkdir -p .runtime
 curl --fail --location --retry 3 --max-time 300 https://github.com/coder/code-server/releases/download/v4.139.1/code-server-4.139.1-linux-amd64.tar.gz -o .runtime/code-server.tar.gz
