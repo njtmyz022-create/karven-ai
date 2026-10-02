@@ -16,7 +16,8 @@ test.before(async()=>{
 test.after(async()=>{child.kill('SIGTERM');await once(child,'exit');rmSync(dir,{recursive:true,force:true});});
 const headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};
 test('API requires auth and reports missing configuration honestly',async()=>{
- assert.equal((await fetch(`${origin}/api/health`)).status,401);
+ const publicHealth=await (await fetch(`${origin}/api/health`)).json();assert.equal(publicHealth.accessMode,'token');assert.equal(publicHealth.browserReady,false);assert.equal(publicHealth.apiKey,undefined);
+ assert.equal((await fetch(`${origin}/api/tasks`)).status,401);
  const health=await (await fetch(`${origin}/api/health`,{headers})).json();assert.equal(health.ready,false);
  const response=await fetch(`${origin}/api/tasks`,{method:'POST',headers,body:JSON.stringify({url:'https://example.com',goal:'Test'})});assert.equal(response.status,503);assert.match((await response.json()).error,/LLM_API_KEY/);
 });
@@ -27,6 +28,6 @@ test('persistent interrupted tasks, JSON export and SSE replay',async()=>{
  assert.equal((await fetch(`${origin}/api/tasks/restart-fixture`,{method:'DELETE',headers})).status,409);
 });
 test('dashboard assets serve Karvin and reject path traversal',async()=>{
- const response=await fetch(origin);assert.equal(response.status,200);assert.match(await response.text(),/KARVIN IDE/);assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+ const response=await fetch(origin);assert.equal(response.status,200);const html=await response.text();assert.match(html,/KARVIN AI/);assert.doesNotMatch(html,/Cline|GitHub|code-server/i);assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
  assert.equal((await fetch(`${origin}/app.js`)).status,200);assert.equal((await fetch(`${origin}/style.css`)).status,200);assert.equal((await fetch(`${origin}/.env`)).status,404);
 });

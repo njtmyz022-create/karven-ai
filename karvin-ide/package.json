@@ -9,7 +9,7 @@
   "scripts": {
     "start:ide": "node --env-file-if-exists=.env ide.mjs",
     "start": "node --env-file-if-exists=.env server.mjs",
-    "test": "node --test test/agent.test.mjs test/server.test.mjs test/coding.test.mjs test/ui.test.mjs test/ide.test.mjs",
+    "test": "node --test test/agent.test.mjs test/server.test.mjs test/coding.test.mjs test/ui.test.mjs test/ide.test.mjs test/accounts.test.mjs",
     "test:browser": "node --test test/browser.test.mjs"
   },
   "dependencies": {

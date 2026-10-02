@@ -1,30 +1,35 @@
-import {spawn} from 'node:child_process';
-import {mkdirSync,existsSync,writeFileSync,cpSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {mkdirSync,existsSync,readFileSync,openSync,writeSync,closeSync,chmodSync} from 'node:fs';
+import {randomBytes} from 'node:crypto';
+import {resolve,join} from 'node:path';
 import {createKarvinServer} from './server.mjs';
 import {createIDEProxy} from './ide-proxy.mjs';
 import {createCodespacesGate} from './codespaces-gateway.mjs';
+import {IDEWorkers} from './ide-workers.mjs';
 
-const dataDir=resolve(process.env.DATA_DIR||'data'),idePort=Number(process.env.IDE_PORT||8081);
-if((process.env.WEB_AGENT_TOKEN||'').length<24)throw new Error('WEB_AGENT_TOKEN must contain at least 24 characters');
-const githubGateway=process.env.KARVIN_GITHUB_GATEWAY==='true';
-const gate=githubGateway?createCodespacesGate():null;
+const dataDir=resolve(process.env.DATA_DIR||'data');mkdirSync(dataDir,{recursive:true,mode:0o700});
 const executable=resolve(process.env.CODE_SERVER_BIN||'.runtime/code-server/bin/code-server');
-if(!existsSync(executable))throw new Error('code-server is missing. Run bash scripts/build-ide.sh first.');
-for(const dir of ['projects','ide/User','ide-home'])mkdirSync(`${dataDir}/${dir}`,{recursive:true});
-if(!existsSync(`${dataDir}/ide/User/settings.json`))writeFileSync(`${dataDir}/ide/User/settings.json`,JSON.stringify({'workbench.colorTheme':'Default Dark Modern','window.title':'${dirty}${activeEditorShort}${separator}KARVIN IDE','workbench.startupEditor':'readme','telemetry.telemetryLevel':'off','files.autoSave':'afterDelay','terminal.integrated.defaultProfile.linux':'bash'},null,2));
-if(existsSync('.runtime/extensions')&&!existsSync(`${dataDir}/extensions`))cpSync('.runtime/extensions',`${dataDir}/extensions`,{recursive:true});
-if(!existsSync(`${dataDir}/projects/README.md`))writeFileSync(`${dataDir}/projects/README.md`,'# KARVIN IDE\n\nWelcome to your coding workspace.\n\n- Open the Terminal menu to run commands, install dependencies, and start apps.\n- Open Cline from the sidebar and configure your model provider.\n- Open Karvin Mission Control in a second tab for approved coding and browser tasks.\n- Project folders created in Mission Control appear here by project ID.\n- Preview a running app with /ide/proxy/PORT/ on this same site.\n- Commit and push your work to Git, or export a ZIP before closing. Free hosting storage is temporary.\n\nThis is one private workspace for its owner.\n');
-const agent=createKarvinServer({host:'127.0.0.1',port:0,dataDir,accessMode:githubGateway?'github':'token'});
-await new Promise(r=>agent.server.listen(0,'127.0.0.1',r));
-const child=spawn(executable,['--bind-addr',`127.0.0.1:${idePort}`,'--auth','password','--disable-telemetry','--disable-update-check','--app-name','KARVIN IDE','--user-data-dir',`${dataDir}/ide`,'--extensions-dir',`${dataDir}/extensions`,`${dataDir}/projects`],{stdio:'inherit',detached:process.platform!=='win32',env:{PATH:process.env.PATH,HOME:`${dataDir}/ide-home`,LANG:'C.UTF-8',PASSWORD:process.env.WEB_AGENT_TOKEN,NODE_OPTIONS:'--max-old-space-size=256'}});
+if(!existsSync(executable))throw new Error('code-server is missing. Build the full IDE image before starting Karvin.');
+function internalSecret(){
+ const supplied=process.env.KARVIN_INTERNAL_TOKEN;if(supplied&&supplied.length>=24)return supplied;
+ const path=join(dataDir,'.internal-token');if(existsSync(path)){const value=readFileSync(path,'utf8').trim();if(value.length>=24){chmodSync(path,0o600);return value;}throw new Error('Stored internal service key is invalid');}
+ const value=randomBytes(32).toString('base64url');let fd;try{fd=openSync(path,'wx',0o600);writeSync(fd,value);closeSync(fd);chmodSync(path,0o600);return value;}catch(error){if(fd!==undefined)try{closeSync(fd);}catch{}if(error.code==='EEXIST'){const existing=readFileSync(path,'utf8').trim();if(existing.length>=24)return existing;}throw error;}
+}
+const internalToken=internalSecret(),githubGateway=process.env.KARVIN_GITHUB_GATEWAY==='true'||process.env.CODESPACES==='true';
+const gate=githubGateway?createCodespacesGate():null;
+const agent=createKarvinServer({host:'127.0.0.1',port:0,dataDir,authMode:'accounts',accessMode:'accounts',internalToken,allowOwnerBootstrap:githubGateway});
+await new Promise(resolve=>agent.server.listen(0,'127.0.0.1',resolve));
+const agentPort=agent.server.address().port;
+const ideManager=new IDEWorkers({dataDir,executable,extensionsDir:resolve('.runtime/extensions')});
+const resolveUser=async req=>{
+ try{
+  const response=await fetch(`http://127.0.0.1:${agentPort}/api/internal/session`,{headers:{cookie:req.headers.cookie||'',authorization:`Bearer ${internalToken}`},signal:AbortSignal.timeout(3000)});
+  if(!response.ok){await response.body?.cancel();return null;}
+  return (await response.json()).user;
+ }catch{return null;}
+};
+const proxy=createIDEProxy({agentPort,gate,agentToken:githubGateway?internalToken:null,ideManager,resolveUser,healthCheck:async()=>existsSync(executable)&&ideManager.isolationReady});
 let stopping=false;
-const proxy=createIDEProxy({idePort,agentPort:agent.server.address().port,gate,agentToken:githubGateway?process.env.WEB_AGENT_TOKEN:null,editorToken:githubGateway?process.env.WEB_AGENT_TOKEN:null});
-async function shutdown(code=0){if(stopping)return;stopping=true;proxy.close();try{if(child.pid)process.kill(process.platform==='win32'?child.pid:-child.pid,'SIGTERM');}catch{}await agent.close();process.exit(code);}
-child.on('error',error=>{console.error('IDE process failed:',error.message);void shutdown(1);});
-child.on('exit',code=>{if(!stopping){console.error('IDE process exited:',code);void shutdown(1);}});
+async function shutdown(code=0){if(stopping)return;stopping=true;proxy.close();await ideManager.close();await agent.close();if(code)process.exit(code);}
+proxy.on('error',error=>{console.error('KARVIN proxy failed:',error.message);void shutdown(1);});
 for(const signal of ['SIGTERM','SIGINT','SIGHUP'])process.on(signal,()=>{void shutdown();setTimeout(()=>process.exit(0),5000).unref();});
-// Fail startup if the IDE never responds; don't publish an apparently healthy shell.
-for(let i=0;i<120;i++){try{const r=await fetch(`http://127.0.0.1:${idePort}/healthz`);if(r.ok)break;}catch{}if(i===119)throw new Error('IDE startup timed out');await new Promise(r=>setTimeout(r,500));}
-proxy.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('KARVIN IDE ready: /ide/ · Mission Control: /workspace'));
-
+proxy.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('KARVIN platform ready: sign in · workspace · IDE · app previews'));

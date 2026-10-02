@@ -1,5 +1,5 @@
 import {resolve,relative,dirname,sep} from 'node:path';
-import {mkdir,readdir,lstat,readFile,writeFile,realpath,unlink} from 'node:fs/promises';
+import {mkdir,readdir,lstat,readFile,writeFile,realpath,unlink,chown,chmod} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
 const OMIT=new Set(['node_modules','.git','.env','.karvin-runtime','data','.cline']);
 export const MAX_FILE_BYTES=100000;
@@ -8,9 +8,10 @@ export function safeRelative(path){
  return path;
 }
 export class ProjectStore {
- constructor(root){this.root=resolve(root);}
+ constructor(root,{uid,gid=uid}={}){this.root=resolve(root);this.uid=uid;this.gid=gid;}
+ async own(path,mode){if(this.uid!==undefined){await chown(path,this.uid,this.gid);if(mode!==undefined)await chmod(path,mode);}}
  directory(id){if(!/^[a-f0-9-]{36}$/.test(id))throw new Error('Invalid project ID');return resolve(this.root,id);}
- async create(id){await mkdir(this.directory(id),{recursive:true});}
+ async create(id){await mkdir(this.directory(id),{recursive:true,mode:0o700});await this.own(this.root,0o700);await this.own(this.directory(id),0o700);}
  async path(id,path,{create=false}={}){
   safeRelative(path);const root=this.directory(id),dest=resolve(root,path);
   if(relative(root,dest).startsWith(`..${sep}`))throw new Error('Path escapes project');
@@ -29,7 +30,7 @@ export class ProjectStore {
  }
  async read(id,path){const dest=await this.path(id,path);const stat=await lstat(dest);if(!stat.isFile()||stat.size>MAX_FILE_BYTES)throw new Error('Only text files up to 100 KB can be opened');const text=await readFile(dest,'utf8');if(text.includes('\0'))throw new Error('Binary files are not supported');return text;}
  async optionalRead(id,path){try{return await this.read(id,path);}catch(e){if(e.code==='ENOENT')return null;throw e;}}
- async write(id,path,text){if(typeof text!=='string'||Buffer.byteLength(text)>MAX_FILE_BYTES||text.includes('\0'))throw new Error('File must be UTF-8 text up to 100 KB');const dest=await this.path(id,path,{create:true});await mkdir(dirname(dest),{recursive:true});await writeFile(dest,text,{flag:'w'});return {path,bytes:Buffer.byteLength(text)};}
+ async write(id,path,text){if(typeof text!=='string'||Buffer.byteLength(text)>MAX_FILE_BYTES||text.includes('\0'))throw new Error('File must be UTF-8 text up to 100 KB');const dest=await this.path(id,path,{create:true});const parent=dirname(dest);await mkdir(parent,{recursive:true,mode:0o700});await this.own(this.root,0o700);await this.own(this.directory(id),0o700);let current=parent;while(current!==this.directory(id)&&current.startsWith(`${this.directory(id)}${sep}`)){await this.own(current,0o700);current=dirname(current);}await writeFile(dest,text,{flag:'w',mode:0o600});await this.own(dest,0o600);return {path,bytes:Buffer.byteLength(text)};}
  async remove(id,path){await unlink(await this.path(id,path));}
  async manifest(id){return this.list(id);}
 }

@@ -1,4 +1,4 @@
-// Bridges an OpenAI-compatible chat/completions provider to Cline's AgentModel.
+// Bridges an OpenAI-compatible chat/completions provider to the coding agent model interface.
 export function toChatMessages(request){
  const messages=request.systemPrompt?[{role:'system',content:request.systemPrompt}]:[];
  for(const message of request.messages){

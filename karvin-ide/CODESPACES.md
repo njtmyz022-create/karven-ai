@@ -1,11 +1,9 @@
-# KARVIN IDE on GitHub Codespaces
+# KARVIN in GitHub Codespaces
 
-Open the `karvin-ide-live` branch in GitHub Codespaces. The devcontainer installs the editor, Cline extension, Chromium, dependencies, and GitHub CLI. Port 3000 opens the full Karvin landing page. `/ide/` opens the editor and `/workspace` opens Mission Control.
+Karvin opens on port 3000. The launcher detects Codespaces, verifies the forwarded port remains private, and fails closed if verification is unavailable. Keep the port private and do not forward the internal agent service or an editor worker port directly.
 
-The Codespaces launcher uses your existing private GitHub gateway instead of asking for a second workspace password. The application verifies port 3000 is private with the GitHub CLI before allowing each request; a failed verification refuses access. Any forwarded editor port must also remain private. Non-Codespaces deployments retain token and code-server password authentication. Do not publish the editor port.
+The first account becomes the owner through the verified private Codespaces gateway; no owner email or deployment token needs to be copied into a configuration file. Registration is invitation-only after the owner is created. The owner can create seven-day invitation links from **Users & access**. Users create their own account passwords in Karvin. Connect an AI provider later in **AI connections** if you want to run coding or browser missions.
 
-Model access is separate: connect your preferred provider in Cline or Mission Control. No model is configured by default.
+The Codespaces container needs to permit Linux file ownership changes and per-user process IDs for isolated IDE workers. Karvin reports the IDE as unavailable if the Codespace cannot provide those capabilities. Keep the workspace data directory persistent; provider connections and account data are stored there.
 
-To restart after a source update, stop the process referenced by `data/ide-launcher.pid`, then run `node ../.devcontainer/start-karvin.mjs`. Never display `.env` or share its values.
-
-Codespaces stops after inactivity and is subject to your account quota. Open the Codespace again to resume the app. Commit or export work you want to keep.
+To build or refresh the IDE runtime, run `bash scripts/build-ide.sh`, then start the platform with `npm run start:ide`. The landing page is `/`, sign-in is `/login`, mission control is `/workspace`, and the editor is `/ide/`.

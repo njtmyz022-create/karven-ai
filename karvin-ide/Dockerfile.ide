@@ -9,8 +9,7 @@ COPY karvin-ide/test ./test
 COPY karvin-ide/CLINE-LICENSE karvin-ide/LICENSE ./
 RUN npm test && npm prune --omit=dev
 RUN mkdir -p .runtime/code-server && curl -fL --retry 3 https://github.com/coder/code-server/releases/download/v4.139.1/code-server-4.139.1-linux-amd64.tar.gz -o .runtime/code-server.tar.gz && echo '53029be6c5781b7bca49b815fcc9a2a3fc111813ad8c9965b2c0f0d2985a0674  .runtime/code-server.tar.gz' | sha256sum --check && tar -xzf .runtime/code-server.tar.gz -C .runtime/code-server --strip-components=1 && rm .runtime/code-server.tar.gz
-RUN curl -fL --retry 3 https://open-vsx.org/api/saoudrizwan/claude-dev/4.1.22/file/saoudrizwan.claude-dev-4.1.22.vsix -o .runtime/cline.vsix && .runtime/code-server/bin/code-server --extensions-dir .runtime/extensions --install-extension .runtime/cline.vsix && rm .runtime/cline.vsix
-ENV NODE_ENV=production DATA_DIR=/data MAX_CONCURRENCY=1 ENABLE_PROJECT_COMMANDS=true
+RUN mkdir -p .runtime/extensions
+ENV NODE_ENV=production DATA_DIR=/data MAX_CONCURRENCY=1 ENABLE_PROJECT_COMMANDS=false
 EXPOSE 3000
 CMD ["node", "ide.mjs"]
-

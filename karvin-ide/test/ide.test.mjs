@@ -60,3 +60,23 @@ test('private gateway opens password-protected editor with an internal session',
  const proxy=createIDEProxy({idePort:await listen(ide),agentPort:await listen(agent),gate:{allow:async()=>true,verify:async()=>true},editorToken:'internal-secret'}),base=`http://127.0.0.1:${await listen(proxy)}`;
  try{assert.equal((await fetch(base+'/ide/')).status,200);assert.equal((await fetch(base+'/ide/')).status,200);assert.equal(logins,1);}finally{await close(proxy);await close(agent);await close(ide);}
 });
+
+test('account IDE requests route to separate worker ports and editor sessions',async()=>{
+ const sessions=new Map(),logins=new Map(),editors=new Map();
+ for(const id of ['alice','bob']){
+  const editor=http.createServer(async(req,res)=>{
+   if(req.url==='/login'){let body='';for await(const chunk of req)body+=chunk;assert.equal(new URLSearchParams(body).get('password'),`worker-secret-${id}`);logins.set(id,(logins.get(id)||0)+1);sessions.set(id,`editor-session-${id}`);res.writeHead(302,{'set-cookie':`editor=${sessions.get(id)}; HttpOnly; Path=/`,'location':'/'});return res.end();}
+   res.writeHead(req.headers.cookie===`editor=${sessions.get(id)}`?200:401);res.end(`${id}:${req.headers.cookie||'no-session'}`);
+  });editors.set(id,{server:editor,port:await listen(editor)});
+ }
+ const agent=http.createServer((req,res)=>res.end('missions'));
+ const users={alice:{id:'alice',uid:20001},bob:{id:'bob',uid:20002}};
+ const ideManager={async get(user){return {port:editors.get(user.id).port,password:`worker-secret-${user.id}`};}};
+ const proxy=createIDEProxy({idePort:0,agentPort:await listen(agent),ideManager,resolveUser:async req=>users[req.headers.cookie?.split('=')[1]]||null}),port=await listen(proxy),base=`http://127.0.0.1:${port}`;
+ try{
+  const alice=await fetch(`${base}/ide/`,{headers:{cookie:'karvin_session=alice'}});assert.equal(alice.status,200);assert.equal(await alice.text(),'alice:editor=editor-session-alice');
+  const bob=await fetch(`${base}/ide/`,{headers:{cookie:'karvin_session=bob'}});assert.equal(bob.status,200);assert.equal(await bob.text(),'bob:editor=editor-session-bob');
+  const aliceAgain=await fetch(`${base}/ide/`,{headers:{cookie:'karvin_session=alice'}});assert.equal(aliceAgain.status,200);assert.equal(await aliceAgain.text(),'alice:editor=editor-session-alice');assert.equal(logins.get('alice'),1);assert.equal(logins.get('bob'),1);
+  const anonymous=await fetch(`${base}/ide/`,{redirect:'manual'});assert.equal(anonymous.status,302);assert.match(anonymous.headers.get('location')||'',/login/);
+ }finally{await close(proxy);await close(agent);for(const {server} of editors.values())await close(server);}
+});
