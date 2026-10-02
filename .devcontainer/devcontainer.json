@@ -16,7 +16,7 @@
       "visibility": "private"
     }
   },
-  "postCreateCommand": "ln -sfn /app/node_modules node_modules && ln -sfn /app/.runtime .runtime",
+  "postCreateCommand": "npm ci && ln -sfn /app/.runtime .runtime",
   "postStartCommand": "node ../.devcontainer/start-karvin.mjs",
   "shutdownAction": "stopContainer",
   "hostRequirements": {
