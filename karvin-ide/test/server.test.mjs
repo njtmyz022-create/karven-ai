@@ -27,7 +27,8 @@ test('persistent interrupted tasks, JSON export and SSE replay',async()=>{
  const events=await fetch(`${origin}/api/tasks/restart-fixture/events`,{headers});assert.equal(events.headers.get('content-type'),'text/event-stream');assert.match(await events.text(),/connected/);
  assert.equal((await fetch(`${origin}/api/tasks/restart-fixture`,{method:'DELETE',headers})).status,409);
 });
-test('dashboard assets serve Karvin and reject path traversal',async()=>{
- const response=await fetch(origin);assert.equal(response.status,200);const html=await response.text();assert.match(html,/KARVIN AI/);assert.doesNotMatch(html,/Cline|GitHub|code-server/i);assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
- assert.equal((await fetch(`${origin}/app.js`)).status,200);assert.equal((await fetch(`${origin}/style.css`)).status,200);assert.equal((await fetch(`${origin}/.env`)).status,404);
+test('generated landing and mission pages are retired; the account gate remains',async()=>{
+ for(const path of ['/','/workspace','/landing.css','/landing.js','/app.js','/style.css','/.env'])assert.equal((await fetch(`${origin}${path}`)).status,404,path);
+ const response=await fetch(`${origin}/login`);assert.equal(response.status,200);const html=await response.text();assert.match(html,/KARVIN/);assert.doesNotMatch(html,/Cline|GitHub|code-server/i);assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+ const auth=await fetch(`${origin}/auth.js`);assert.match(await auth.text(),/params\.get\('next'\)\|\|'\/'/);
 });

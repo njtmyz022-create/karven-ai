@@ -5,6 +5,7 @@ import {createKarvinServer} from './server.mjs';
 import {createIDEProxy} from './ide-proxy.mjs';
 import {createCodespacesGate} from './codespaces-gateway.mjs';
 import {IDEWorkers} from './ide-workers.mjs';
+import {ClineHubWorkers} from './cline-hub-workers.mjs';
 
 const dataDir=resolve(process.env.DATA_DIR||'data');mkdirSync(dataDir,{recursive:true,mode:0o700});
 const executable=resolve(process.env.CODE_SERVER_BIN||'.runtime/code-server/bin/code-server');
@@ -20,6 +21,7 @@ const agent=createKarvinServer({host:'127.0.0.1',port:0,dataDir,authMode:'accoun
 await new Promise(resolve=>agent.server.listen(0,'127.0.0.1',resolve));
 const agentPort=agent.server.address().port;
 const ideManager=new IDEWorkers({dataDir,executable,extensionsDir:resolve('.runtime/extensions')});
+const clineHubManager=new ClineHubWorkers({dataDir,workspaceManager:ideManager,isolationReady:ideManager.isolationReady});
 const resolveUser=async req=>{
  try{
   const response=await fetch(`http://127.0.0.1:${agentPort}/api/internal/session`,{headers:{cookie:req.headers.cookie||'',authorization:`Bearer ${internalToken}`},signal:AbortSignal.timeout(3000)});
@@ -27,9 +29,9 @@ const resolveUser=async req=>{
   return (await response.json()).user;
  }catch{return null;}
 };
-const proxy=createIDEProxy({agentPort,gate,agentToken:githubGateway?internalToken:null,ideManager,resolveUser,healthCheck:async()=>existsSync(executable)&&ideManager.isolationReady});
+const proxy=createIDEProxy({agentPort,gate,agentToken:githubGateway?internalToken:null,ideManager,clineHubManager,resolveUser,healthCheck:async()=>existsSync(executable)&&ideManager.isolationReady&&clineHubManager.isReady()});
 let stopping=false;
-async function shutdown(code=0){if(stopping)return;stopping=true;proxy.close();await ideManager.close();await agent.close();if(code)process.exit(code);}
+async function shutdown(code=0){if(stopping)return;stopping=true;proxy.close();await Promise.all([ideManager.close(),clineHubManager.close()]);await agent.close();if(code)process.exit(code);}
 proxy.on('error',error=>{console.error('KARVIN proxy failed:',error.message);void shutdown(1);});
 for(const signal of ['SIGTERM','SIGINT','SIGHUP'])process.on(signal,()=>{void shutdown();setTimeout(()=>process.exit(0),5000).unref();});
-proxy.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('KARVIN platform ready: sign in · workspace · IDE · app previews'));
+proxy.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('KARVIN AI ready: sign in · private AI workspace · IDE'));

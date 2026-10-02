@@ -14,16 +14,9 @@ import {zipSync,strToU8} from 'fflate';
 
 const SETTING_KEYS=['LLM_API_KEY','LLM_MODEL','LLM_BASE_URL','CODE_API_KEY','CODE_MODEL','CODE_BASE_URL','CODE_PROVIDER_ID'];
 const PUBLIC_ASSETS={
- '/':['landing.html','text/html'],
- '/workspace':['index.html','text/html'],
  '/login':['auth.html','text/html'],
  '/auth.js':['auth.js','text/javascript'],
  '/auth.css':['auth.css','text/css'],
- '/platform.css':['platform.css','text/css'],
- '/landing.css':['landing.css','text/css'],
- '/landing.js':['landing.js','text/javascript'],
- '/app.js':['app.js','text/javascript'],
- '/style.css':['style.css','text/css'],
 };
 function ownTree(path,uid){const stat=lstatSync(path);chownSync(path,uid,uid);chmodSync(path,stat.isDirectory()?0o700:0o600);if(stat.isDirectory())for(const name of readdirSync(path))ownTree(join(path,name),uid);}
 
@@ -208,12 +201,12 @@ export function createKarvinServer(config={}){
     }
     if(u.pathname==='/api/billing/status'&&req.method==='GET')return json(res,200,{enabled:false,plan:'unmetered-development',status:'payments-not-configured',message:'Payments are intentionally disabled until Karvin billing is configured.'});
     if(u.pathname==='/api/apps'&&req.method==='GET')return json(res,200,[
+     {id:'workspace',name:'Karvin AI workspace',category:'development',href:'/',status:'available'},
      {id:'ide',name:'Karvin IDE',category:'development',href:'/ide/',status:'available'},
      {id:'terminal',name:'Terminal',category:'development',href:'/ide/',status:'available'},
      {id:'git',name:'Git',category:'development',href:'/ide/',status:'available'},
-     {id:'extensions',name:'Editor extensions',category:'development',href:'/ide/',status:'available'},
-     {id:'projects',name:'Projects and files',category:'workspace',href:'/workspace#projects-panel',status:'available'},
-     {id:'missions',name:'AI missions',category:'automation',href:'/workspace',status:'available'},
+     {id:'projects',name:'Projects and files',category:'workspace',href:'/',status:'available'},
+     {id:'missions',name:'AI sessions',category:'automation',href:'/sessions',status:'available'},
      {id:'previews',name:'App previews',category:'development',href:'/ide/',status:'available'},
     ]);
     if(u.pathname==='/api/settings'&&req.method==='GET'){
@@ -284,9 +277,6 @@ export function createKarvinServer(config={}){
     return json(res,200,task);
    }
    const asset=PUBLIC_ASSETS[u.pathname];if(!asset)return json(res,404,{error:'Not found'});
-   if(authMode==='accounts'&&u.pathname==='/workspace'&&!accounts.sessionFromRequest(req)){
-    res.writeHead(302,{Location:`/login?next=${encodeURIComponent('/workspace')}`,'Cache-Control':'no-store'});return res.end();
-   }
    res.writeHead(200,{'Content-Type':asset[1],'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});
    res.end(readFileSync(new URL(`./public/${asset[0]}`,import.meta.url)));
   }catch(error){if(!res.headersSent)json(res,error.status|| (error.code==='ENOENT'?404:400),{error:error.message});else res.end();}

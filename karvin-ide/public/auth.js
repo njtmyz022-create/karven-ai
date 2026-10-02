@@ -2,8 +2,8 @@ const $=id=>document.getElementById(id);
 const params=new URLSearchParams(location.search);
 const inviteToken=params.get('invite')||'';
 let mode='login';
-const requested=params.get('next')||'/workspace';
-const destination=requested.startsWith('/')&&!requested.startsWith('//')?requested:'/workspace';
+const requested=params.get('next')||'/';
+const destination=requested.startsWith('/')&&!requested.startsWith('//')?requested:'/';
 function setMode(next){
  mode=next;const signup=mode==='register';
  $('signin-tab').setAttribute('aria-selected',String(!signup));$('signup-tab').setAttribute('aria-selected',String(signup));

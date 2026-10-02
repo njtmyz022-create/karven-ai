@@ -24,7 +24,7 @@ test('accounts get isolated sessions, projects, tasks and encrypted provider set
  const status=await call('/api/auth/status');assert.deepEqual(status.data,{enabled:true,registrationOpen:true,ownerSetupReady:true,hasOwner:false});
  assert.equal((await call('/api/auth/register',{method:'POST',body:{name:'Wrong Owner',email:'wrong@example.com',password:'safe-password-for-wrong'}})).response.status,403);
  const alice=await createAccount({name:'Alice Owner',email:'ALICE@example.com',password:'safe-password-for-alice'});
- assert.equal(alice.user.role,'owner');const protectedPage=await fetch(`${base}/workspace`,{redirect:'manual'});assert.equal(protectedPage.status,302);assert.match(protectedPage.headers.get('location')||'',/login/);
+ assert.equal(alice.user.role,'owner');assert.equal((await fetch(`${base}/workspace`,{redirect:'manual'})).status,404);
  ownerCookie=alice.cookie;assert.match(ownerCookie,/karvin_session=/);assert.equal((await call('/api/auth/me',{cookie:ownerCookie})).response.status,200);
  const secureSignup=await call('/api/auth/login',{method:'POST',body:{email:'alice@example.com',password:'safe-password-for-alice'},headers:{'x-forwarded-proto':'https'}});
  assert.equal(secureSignup.response.status,200);
