@@ -1,5 +1,6 @@
 FROM oven/bun:1.4.2 AS cline-builder
-RUN apt-get update && apt-get install -y --no-install-recommends git curl unzip ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git curl unzip ca-certificates python3 make g++ && rm -rf /var/lib/apt/lists/*
+ENV PYTHON=/usr/bin/python3
 WORKDIR /workspace/karvin-ide
 COPY karvin-ide/scripts ./scripts
 RUN bash scripts/build-cline-hub.sh && rm -rf .runtime/cline-source/.git && if [ "$(command -v bun)" != "/usr/local/bin/bun" ]; then cp "$(command -v bun)" /usr/local/bin/bun; fi
