@@ -12,6 +12,7 @@ RUN npm ci
 COPY *.mjs ./
 COPY public ./public
 COPY test ./test
+COPY scripts ./scripts
 COPY CLINE-LICENSE LICENSE ./
 RUN npm test && npm prune --omit=dev && rm -rf test
 RUN mkdir -p .runtime/code-server && curl -fL --retry 3 https://github.com/coder/code-server/releases/download/v4.139.1/code-server-4.139.1-linux-amd64.tar.gz -o .runtime/code-server.tar.gz && echo '53029be6c5781b7bca49b815fcc9a2a3fc111813ad8c9965b2c0f0d2985a0674  .runtime/code-server.tar.gz' | sha256sum --check && tar -xzf .runtime/code-server.tar.gz -C .runtime/code-server --strip-components=1 && rm .runtime/code-server.tar.gz
